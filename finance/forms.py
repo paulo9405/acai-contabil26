@@ -103,3 +103,75 @@ class ExpenseFilterForm(forms.Form):
             raise ValidationError('A data inicial não pode ser maior que a data final.')
 
         return cleaned_data
+
+
+class DailyClosingForm(forms.ModelForm):
+    """
+    Formulário para criação e edição de fechamento diário.
+    """
+    class Meta:
+        model = DailyClosing
+        fields = ['date', 'order_count', 'cash_sales', 'pix_sales', 'card_sales', 'notes']
+        widgets = {
+            'date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control form-control-lg',
+            }),
+            'order_count': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'min': '0',
+                'placeholder': '0',
+            }),
+            'cash_sales': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0,00',
+            }),
+            'pix_sales': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0,00',
+            }),
+            'card_sales': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0,00',
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Observações opcionais sobre o dia',
+            }),
+        }
+        labels = {
+            'date': 'Data',
+            'order_count': 'Quantidade de Pedidos',
+            'cash_sales': 'Vendas em Dinheiro (R$)',
+            'pix_sales': 'Vendas em Pix (R$)',
+            'card_sales': 'Vendas em Cartão (R$)',
+            'notes': 'Observações',
+        }
+
+    def clean_date(self):
+        """Valida que a data não é futura."""
+        date = self.cleaned_data.get('date')
+        if date and date > timezone.now().date():
+            raise ValidationError('A data não pode ser futura.')
+        return date
+
+    def clean(self):
+        """Validações customizadas do formulário."""
+        cleaned_data = super().clean()
+        date = cleaned_data.get('date')
+
+        # Valida fechamento duplicado (apenas na criação)
+        if date and self.instance.pk is None:
+            if DailyClosing.objects.filter(date=date).exists():
+                raise ValidationError({
+                    'date': f'Já existe um fechamento para {date.strftime("%d/%m/%Y")}.'
+                })
+
+        return cleaned_data

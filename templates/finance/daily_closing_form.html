@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3"><i class="bi bi-calendar-check"></i> {{ title }}</h1>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-12 col-md-10 col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Data -->
+                        <div class="mb-3">
+                            <label for="{{ form.date.id_for_label }}" class="form-label">
+                                {{ form.date.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.date }}
+                            {% if form.date.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.date.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Quantidade de Pedidos -->
+                        <div class="mb-3">
+                            <label for="{{ form.order_count.id_for_label }}" class="form-label">
+                                {{ form.order_count.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.order_count }}
+                            {% if form.order_count.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.order_count.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="alert alert-info">
+                            <small><i class="bi bi-info-circle"></i> <strong>Valores de Vendas:</strong> Preencha os valores recebidos em cada forma de pagamento.</small>
+                        </div>
+
+                        <!-- Vendas em Dinheiro -->
+                        <div class="mb-3">
+                            <label for="{{ form.cash_sales.id_for_label }}" class="form-label">
+                                <i class="bi bi-cash-coin"></i> {{ form.cash_sales.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.cash_sales }}
+                            {% if form.cash_sales.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.cash_sales.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Vendas em Pix -->
+                        <div class="mb-3">
+                            <label for="{{ form.pix_sales.id_for_label }}" class="form-label">
+                                <i class="bi bi-phone"></i> {{ form.pix_sales.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.pix_sales }}
+                            {% if form.pix_sales.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.pix_sales.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Vendas em Cartão -->
+                        <div class="mb-3">
+                            <label for="{{ form.card_sales.id_for_label }}" class="form-label">
+                                <i class="bi bi-credit-card"></i> {{ form.card_sales.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.card_sales }}
+                            {% if form.card_sales.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.card_sales.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="mb-4">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                {{ form.notes.label }}
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.notes.errors }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                Ex: Jogo do Brasil, Promoção, Chuva forte, etc.
+                            </small>
+                        </div>
+
+                        <!-- Erros não relacionados a campos -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle"></i> {{ button_text }}
+                            </button>
+                            <a href="{% url 'closing-list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Dica -->
+            <div class="alert alert-success mt-3">
+                <small>
+                    <i class="bi bi-lightbulb"></i>
+                    <strong>Meta:</strong> Registre o fechamento do dia em menos de 20 segundos!
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

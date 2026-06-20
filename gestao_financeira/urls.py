@@ -9,5 +9,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('finance.urls')),
-    path('', RedirectView.as_view(url='/expenses/', permanent=False), name='home'),
+    path('', RedirectView.as_view(url='/closings/', permanent=False), name='home'),
 ]

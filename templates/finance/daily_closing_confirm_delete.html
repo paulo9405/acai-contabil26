@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Excluir Fechamento - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 text-danger"><i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão</h1>
+        </div>
+    </div>
+
+    <!-- Confirmação -->
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6 mx-auto">
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Tem certeza que deseja excluir este fechamento?</h5>
+
+                    <div class="alert alert-danger mt-3">
+                        <p class="mb-2"><strong>Detalhes do fechamento:</strong></p>
+                        <ul class="mb-0">
+                            <li><strong>Data:</strong> {{ object.date|date:"d/m/Y" }}</li>
+                            <li><strong>Pedidos:</strong> {{ object.order_count }}</li>
+                            <li><strong>Vendas em Dinheiro:</strong> R$ {{ object.cash_sales }}</li>
+                            <li><strong>Vendas em Pix:</strong> R$ {{ object.pix_sales }}</li>
+                            <li><strong>Vendas em Cartão:</strong> R$ {{ object.card_sales }}</li>
+                            <li><strong>Total de Vendas:</strong> R$ {{ object.total_sales }}</li>
+                            <li><strong>Ticket Médio:</strong> R$ {{ object.average_ticket|floatformat:2 }}</li>
+                            {% if object.notes %}
+                            <li><strong>Observações:</strong> {{ object.notes|truncatewords:20 }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita. Todos os dados deste fechamento serão perdidos permanentemente.
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash"></i> Sim, Excluir Fechamento
+                            </button>
+                            <a href="{% url 'closing-list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Não, Voltar para Lista
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

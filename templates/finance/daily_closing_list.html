@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Fechamentos Diários - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-3"><i class="bi bi-calendar-check"></i> Fechamentos Diários</h1>
+        </div>
+    </div>
+
+    <!-- Ação Rápida -->
+    <div class="row mb-4">
+        <div class="col">
+            <a href="{% url 'closing-create' %}" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-plus-circle"></i> Novo Fechamento
+            </a>
+        </div>
+    </div>
+
+    <!-- Lista de Fechamentos -->
+    {% if closings %}
+        <!-- Mobile View (cards) -->
+        <div class="d-md-none">
+            {% for closing in closings %}
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-calendar3"></i> {{ closing.date|date:"d/m/Y" }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <small class="text-muted">Pedidos</small>
+                            <p class="mb-0 fw-bold">{{ closing.order_count }}</p>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Ticket Médio</small>
+                            <p class="mb-0 fw-bold">R$ {{ closing.average_ticket|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row mb-2">
+                        <div class="col-4">
+                            <small class="text-muted">Dinheiro</small>
+                            <p class="mb-0">R$ {{ closing.cash_sales }}</p>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Pix</small>
+                            <p class="mb-0">R$ {{ closing.pix_sales }}</p>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Cartão</small>
+                            <p class="mb-0">R$ {{ closing.card_sales }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <small class="text-muted">Total de Vendas</small>
+                        <h4 class="mb-0 text-success">R$ {{ closing.total_sales }}</h4>
+                    </div>
+                    {% if closing.notes %}
+                    <p class="card-text mb-2">
+                        <small><i class="bi bi-info-circle"></i> {{ closing.notes|truncatewords:15 }}</small>
+                    </p>
+                    {% endif %}
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        {% if user.is_superuser %}
+                        <a href="{% url 'closing-delete' closing.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i> Excluir
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Desktop View (table) -->
+        <div class="d-none d-md-block">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Pedidos</th>
+                            <th>Dinheiro</th>
+                            <th>Pix</th>
+                            <th>Cartão</th>
+                            <th>Total</th>
+                            <th>Ticket Médio</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for closing in closings %}
+                        <tr>
+                            <td>{{ closing.date|date:"d/m/Y" }}</td>
+                            <td>{{ closing.order_count }}</td>
+                            <td>R$ {{ closing.cash_sales }}</td>
+                            <td>R$ {{ closing.pix_sales }}</td>
+                            <td>R$ {{ closing.card_sales }}</td>
+                            <td class="fw-bold text-success">R$ {{ closing.total_sales }}</td>
+                            <td>R$ {{ closing.average_ticket|floatformat:2 }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if user.is_superuser %}
+                                <a href="{% url 'closing-delete' closing.pk %}" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Paginação -->
+        {% if is_paginated %}
+        <nav aria-label="Navegação de páginas">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1">Primeira</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <!-- Nenhum fechamento -->
+        <div class="alert alert-warning text-center">
+            <i class="bi bi-info-circle"></i> Nenhum fechamento encontrado.
+            <br>
+            <a href="{% url 'closing-create' %}" class="btn btn-primary btn-sm mt-2">
+                <i class="bi bi-plus-circle"></i> Registrar primeiro fechamento
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
