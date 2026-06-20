@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3"><i class="bi bi-speedometer2"></i> Dashboard</h1>
+            <p class="text-muted">Visão geral do negócio</p>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="row g-2 mb-4">
+        <div class="col-12 col-md-6">
+            <a href="{% url 'closing-create' %}" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-calendar-check"></i> Novo Fechamento
+            </a>
+        </div>
+        <div class="col-12 col-md-6">
+            <a href="{% url 'expense-create' %}" class="btn btn-success btn-lg w-100">
+                <i class="bi bi-receipt"></i> Nova Despesa
+            </a>
+        </div>
+    </div>
+
+    <!-- Métricas de Hoje -->
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-calendar-day"></i> Hoje - {{ today.date|date:"d/m/Y" }}</h4>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Pedidos Hoje -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pedidos</small>
+                    <h3 class="mb-0">{{ today.orders }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendas Hoje -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <small class="text-muted d-block">Vendas</small>
+                    <h3 class="mb-0 text-success">R$ {{ today.sales|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Despesas Hoje -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center border-danger">
+                <div class="card-body">
+                    <small class="text-muted d-block">Despesas</small>
+                    <h3 class="mb-0 text-danger">R$ {{ today.expenses|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lucro Hoje -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center {% if today.profit >= 0 %}border-primary{% else %}border-warning{% endif %}">
+                <div class="card-body">
+                    <small class="text-muted d-block">Lucro</small>
+                    <h3 class="mb-0 {% if today.profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                        R$ {{ today.profit|floatformat:0 }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Médio Hoje -->
+        <div class="col-12 col-md-4 col-lg-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Ticket Médio</small>
+                    <h3 class="mb-0">R$ {{ today.average_ticket|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas do Mês -->
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-calendar-month"></i> Este Mês</h4>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Pedidos Mês -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pedidos</small>
+                    <h3 class="mb-0">{{ month.orders }}</h3>
+                    <small class="text-muted">{{ month.days_with_closing }} dias</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendas Mês -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <small class="text-muted d-block">Vendas</small>
+                    <h3 class="mb-0 text-success">R$ {{ month.sales|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Despesas Mês -->
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card text-center border-danger">
+                <div class="card-body">
+                    <small class="text-muted d-block">Despesas</small>
+                    <h3 class="mb-0 text-danger">R$ {{ month.expenses|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lucro Mês -->
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card text-center {% if month.profit >= 0 %}border-primary{% else %}border-warning{% endif %}">
+                <div class="card-body">
+                    <small class="text-muted d-block">Lucro</small>
+                    <h3 class="mb-0 {% if month.profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                        R$ {{ month.profit|floatformat:0 }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Médio Mês -->
+        <div class="col-12 col-md-4 col-lg-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Ticket Médio</small>
+                    <h3 class="mb-0">R$ {{ month.average_ticket|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos 7 Dias -->
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-graph-up"></i> Últimos 7 Dias</h4>
+        </div>
+    </div>
+
+    <!-- Resumo dos Últimos 7 Dias -->
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total Vendas</small>
+                    <h4 class="mb-0 text-success">R$ {{ last_7_days_sales|floatformat:0 }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card text-center border-danger">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total Despesas</small>
+                    <h4 class="mb-0 text-danger">R$ {{ last_7_days_expenses|floatformat:0 }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card text-center {% if last_7_days_profit >= 0 %}border-primary{% else %}border-warning{% endif %}">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total Lucro</small>
+                    <h4 class="mb-0 {% if last_7_days_profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                        R$ {{ last_7_days_profit|floatformat:0 }}
+                    </h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detalhes dos Últimos 7 Dias -->
+    {% if last_7_days %}
+    <!-- Mobile View (cards) -->
+    <div class="d-md-none">
+        {% for day in last_7_days %}
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <div class="row align-items-center">
+                    <div class="col-3">
+                        <small class="fw-bold">{{ day.date_str }}</small>
+                    </div>
+                    <div class="col-3">
+                        <small class="text-success">R$ {{ day.sales|floatformat:0 }}</small>
+                    </div>
+                    <div class="col-3">
+                        <small class="text-danger">R$ {{ day.expenses|floatformat:0 }}</small>
+                    </div>
+                    <div class="col-3">
+                        <small class="{% if day.profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                            R$ {{ day.profit|floatformat:0 }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop View (table) -->
+    <div class="d-none d-md-block">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th class="text-end">Vendas</th>
+                        <th class="text-end">Despesas</th>
+                        <th class="text-end">Lucro</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for day in last_7_days %}
+                    <tr>
+                        <td>{{ day.date|date:"d/m/Y" }}</td>
+                        <td class="text-end text-success">R$ {{ day.sales }}</td>
+                        <td class="text-end text-danger">R$ {{ day.expenses }}</td>
+                        <td class="text-end {% if day.profit >= 0 %}text-primary fw-bold{% else %}text-warning{% endif %}">
+                            R$ {{ day.profit }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Links Rápidos -->
+    <div class="row g-2 mt-4">
+        <div class="col-12 col-md-6">
+            <a href="{% url 'closing-list' %}" class="btn btn-outline-primary w-100">
+                <i class="bi bi-calendar-check"></i> Ver Todos os Fechamentos
+            </a>
+        </div>
+        <div class="col-12 col-md-6">
+            <a href="{% url 'expense-list' %}" class="btn btn-outline-success w-100">
+                <i class="bi bi-receipt"></i> Ver Todas as Despesas
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

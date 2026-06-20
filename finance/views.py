@@ -6,12 +6,96 @@ from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from django.db.models import Q
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
+from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 
 from finance.models import Expense, ExpenseCategory, DailyClosing
 from finance.forms import ExpenseForm, ExpenseFilterForm, DailyClosingForm
-from finance.services import create_expense, update_expense, create_daily_closing, update_daily_closing
+from finance.services import (
+    create_expense, update_expense, create_daily_closing, update_daily_closing,
+    get_dashboard_metrics, calculate_period_sales, calculate_period_expenses,
+    calculate_period_profit
+)
+
+
+# ============================================================================
+# DASHBOARD VIEW
+# ============================================================================
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    """
+    Dashboard principal do sistema.
+    Exibe métricas do dia, do mês e últimos 7 dias.
+    """
+    template_name = 'finance/dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        """
+        Adiciona métricas ao contexto.
+        """
+        context = super().get_context_data(**kwargs)
+
+        # Métricas do dia e do mês (via service)
+        dashboard_data = get_dashboard_metrics()
+        context['today'] = dashboard_data['today']
+        context['month'] = dashboard_data['month']
+
+        # Últimos 7 dias para visualização
+        today = timezone.now().date()
+        start_date = today - timedelta(days=6)  # 7 dias incluindo hoje
+
+        # Buscar fechamentos dos últimos 7 dias
+        closings = DailyClosing.objects.filter(
+            date__gte=start_date,
+            date__lte=today
+        ).order_by('date')
+
+        # Preparar dados para os últimos 7 dias
+        last_7_days = []
+        for i in range(7):
+            day = start_date + timedelta(days=i)
+
+            # Buscar fechamento do dia
+            try:
+                closing = closings.get(date=day)
+                sales = closing.total_sales
+            except DailyClosing.DoesNotExist:
+                sales = 0
+
+            # Buscar despesas do dia
+            expenses = Expense.objects.filter(date=day).aggregate(
+                total=models.Sum('amount')
+            )['total'] or 0
+
+            profit = sales - expenses
+
+            last_7_days.append({
+                'date': day,
+                'date_str': day.strftime('%d/%m'),
+                'sales': sales,
+                'expenses': expenses,
+                'profit': profit,
+            })
+
+        context['last_7_days'] = last_7_days
+
+        # Totais dos últimos 7 dias
+        context['last_7_days_sales'] = calculate_period_sales(
+            start_date=start_date,
+            end_date=today
+        )
+        context['last_7_days_expenses'] = calculate_period_expenses(
+            start_date=start_date,
+            end_date=today
+        )
+        context['last_7_days_profit'] = calculate_period_profit(
+            start_date=start_date,
+            end_date=today
+        )
+
+        return context
 
 
 # ============================================================================
