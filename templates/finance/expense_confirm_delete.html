@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Excluir Despesa - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 text-danger"><i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão</h1>
+        </div>
+    </div>
+
+    <!-- Confirmação -->
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6 mx-auto">
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Tem certeza que deseja excluir esta despesa?</h5>
+
+                    <div class="alert alert-danger mt-3">
+                        <p class="mb-2"><strong>Detalhes da despesa:</strong></p>
+                        <ul class="mb-0">
+                            <li><strong>Data:</strong> {{ object.date|date:"d/m/Y" }}</li>
+                            <li><strong>Categoria:</strong> {{ object.category.name }}</li>
+                            <li><strong>Valor:</strong> R$ {{ object.amount }}</li>
+                            {% if object.description %}
+                            <li><strong>Descrição:</strong> {{ object.description|truncatewords:20 }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita.
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash"></i> Sim, Excluir Despesa
+                            </button>
+                            <a href="{% url 'expense-list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Não, Voltar para Lista
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

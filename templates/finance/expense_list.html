@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}Despesas - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-3"><i class="bi bi-receipt"></i> Despesas</h1>
+        </div>
+    </div>
+
+    <!-- Ação Rápida -->
+    <div class="row mb-4">
+        <div class="col">
+            <a href="{% url 'expense-create' %}" class="btn btn-success btn-lg w-100">
+                <i class="bi bi-plus-circle"></i> Nova Despesa
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'expense-list' %}">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label for="{{ filter_form.date_from.id_for_label }}" class="form-label">
+                            {{ filter_form.date_from.label }}
+                        </label>
+                        {{ filter_form.date_from }}
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="{{ filter_form.date_to.id_for_label }}" class="form-label">
+                            {{ filter_form.date_to.label }}
+                        </label>
+                        {{ filter_form.date_to }}
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="{{ filter_form.category.id_for_label }}" class="form-label">
+                            {{ filter_form.category.label }}
+                        </label>
+                        {{ filter_form.category }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12 col-md-6">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Filtrar
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-6 mt-2 mt-md-0">
+                        <a href="{% url 'expense-list' %}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-x-circle"></i> Limpar Filtros
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Total -->
+    {% if total_expenses %}
+    <div class="alert alert-info">
+        <strong>Total:</strong> R$ {{ total_expenses|floatformat:2 }}
+    </div>
+    {% endif %}
+
+    <!-- Lista de Despesas -->
+    {% if expenses %}
+        <!-- Mobile View (cards) -->
+        <div class="d-md-none">
+            {% for expense in expenses %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0">{{ expense.category.name }}</h5>
+                        <span class="badge bg-primary">R$ {{ expense.amount }}</span>
+                    </div>
+                    <p class="text-muted mb-2">
+                        <small><i class="bi bi-calendar"></i> {{ expense.date|date:"d/m/Y" }}</small>
+                    </p>
+                    {% if expense.description %}
+                    <p class="card-text mb-2">{{ expense.description|truncatewords:15 }}</p>
+                    {% endif %}
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        {% if user.is_superuser %}
+                        <a href="{% url 'expense-delete' expense.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i> Excluir
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Desktop View (table) -->
+        <div class="d-none d-md-block">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                            <th>Descrição</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses %}
+                        <tr>
+                            <td>{{ expense.date|date:"d/m/Y" }}</td>
+                            <td>{{ expense.category.name }}</td>
+                            <td>R$ {{ expense.amount }}</td>
+                            <td>{{ expense.description|truncatewords:10|default:"-" }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if user.is_superuser %}
+                                <a href="{% url 'expense-delete' expense.pk %}" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Paginação -->
+        {% if is_paginated %}
+        <nav aria-label="Navegação de páginas">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                        Primeira
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                        Anterior
+                    </a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                        Próxima
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}">
+                        Última
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <!-- Nenhuma despesa -->
+        <div class="alert alert-warning text-center">
+            <i class="bi bi-info-circle"></i> Nenhuma despesa encontrada.
+            <br>
+            <a href="{% url 'expense-create' %}" class="btn btn-success btn-sm mt-2">
+                <i class="bi bi-plus-circle"></i> Registrar primeira despesa
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
