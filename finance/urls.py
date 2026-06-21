@@ -9,6 +9,9 @@ urlpatterns = [
     # Dashboard
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
 
+    # Reports
+    path('reports/', views.ReportView.as_view(), name='reports'),
+
     # Expenses
     path('expenses/', views.ExpenseListView.as_view(), name='expense-list'),
     path('expenses/create/', views.ExpenseCreateView.as_view(), name='expense-create'),

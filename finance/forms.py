@@ -175,3 +175,71 @@ class DailyClosingForm(forms.ModelForm):
                 })
 
         return cleaned_data
+
+
+class ReportFilterForm(forms.Form):
+    """
+    Formulário para filtros de relatórios.
+    """
+    PERIOD_CHOICES = [
+        ('today', 'Hoje'),
+        ('yesterday', 'Ontem'),
+        ('last_7_days', 'Últimos 7 dias'),
+        ('last_30_days', 'Últimos 30 dias'),
+        ('this_month', 'Este mês'),
+        ('last_month', 'Mês passado'),
+        ('custom', 'Personalizado'),
+    ]
+
+    period = forms.ChoiceField(
+        choices=PERIOD_CHOICES,
+        required=False,
+        label='Período',
+        initial='this_month',
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-lg',
+            'onchange': 'toggleCustomDates()',
+        })
+    )
+
+    start_date = forms.DateField(
+        required=False,
+        label='Data inicial',
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control form-control-lg',
+            'id': 'start_date',
+        })
+    )
+
+    end_date = forms.DateField(
+        required=False,
+        label='Data final',
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control form-control-lg',
+            'id': 'end_date',
+        })
+    )
+
+    def clean(self):
+        """Valida as datas personalizadas."""
+        cleaned_data = super().clean()
+        period = cleaned_data.get('period')
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+
+        # Se período personalizado, datas são obrigatórias
+        if period == 'custom':
+            if not start_date:
+                raise ValidationError({
+                    'start_date': 'Data inicial é obrigatória para período personalizado.'
+                })
+            if not end_date:
+                raise ValidationError({
+                    'end_date': 'Data final é obrigatória para período personalizado.'
+                })
+            if start_date and end_date and start_date > end_date:
+                raise ValidationError('A data inicial não pode ser maior que a data final.')
+
+        return cleaned_data

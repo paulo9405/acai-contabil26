@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios - Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3"><i class="bi bi-file-earmark-bar-graph"></i> Relatórios Financeiros</h1>
+            <p class="text-muted">Análise detalhada por período</p>
+        </div>
+    </div>
+
+    <!-- Formulário de Filtro -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{% url 'reports' %}">
+                <div class="row g-3">
+                    <!-- Período -->
+                    <div class="col-12">
+                        {{ form.period.label_tag }}
+                        {{ form.period }}
+                    </div>
+
+                    <!-- Datas customizadas -->
+                    <div class="col-12 col-md-6" id="custom-dates" style="display: none;">
+                        {{ form.start_date.label_tag }}
+                        {{ form.start_date }}
+                    </div>
+                    <div class="col-12 col-md-6" id="custom-dates-end" style="display: none;">
+                        {{ form.end_date.label_tag }}
+                        {{ form.end_date }}
+                    </div>
+
+                    <!-- Botão -->
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-search"></i> Gerar Relatório
+                        </button>
+                    </div>
+                </div>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger mt-3">
+                        {{ form.non_field_errors }}
+                        {% for field in form %}
+                            {{ field.errors }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if start_date and end_date %}
+    <!-- Período Selecionado -->
+    <div class="alert alert-info">
+        <strong><i class="bi bi-calendar-range"></i> Período:</strong>
+        {{ start_date|date:"d/m/Y" }} até {{ end_date|date:"d/m/Y" }}
+        {% if period_label %}({{ period_label }}){% endif %}
+    </div>
+
+    <!-- Resumo Financeiro -->
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-graph-up"></i> Resumo do Período</h4>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Pedidos -->
+        <div class="col-6 col-md-4 col-lg">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total de Pedidos</small>
+                    <h3 class="mb-0">{{ total_orders }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendas -->
+        <div class="col-6 col-md-4 col-lg">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total de Vendas</small>
+                    <h3 class="mb-0 text-success">R$ {{ total_sales|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Despesas -->
+        <div class="col-6 col-md-4 col-lg">
+            <div class="card text-center border-danger">
+                <div class="card-body">
+                    <small class="text-muted d-block">Total de Despesas</small>
+                    <h3 class="mb-0 text-danger">R$ {{ total_expenses|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lucro -->
+        <div class="col-6 col-md-6 col-lg">
+            <div class="card text-center {% if total_profit >= 0 %}border-primary{% else %}border-warning{% endif %}">
+                <div class="card-body">
+                    <small class="text-muted d-block">Lucro Líquido</small>
+                    <h3 class="mb-0 {% if total_profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                        R$ {{ total_profit|floatformat:2 }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Médio -->
+        <div class="col-6 col-md-6 col-lg">
+            <div class="card text-center">
+                <div class="card-body">
+                    <small class="text-muted d-block">Ticket Médio</small>
+                    <h3 class="mb-0">R$ {{ average_ticket|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Despesas por Categoria -->
+    {% if expenses_by_category %}
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-pie-chart"></i> Despesas por Categoria</h4>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-end">% do Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in expenses_by_category %}
+                        <tr>
+                            <td>{{ item.category__name }}</td>
+                            <td class="text-end">R$ {{ item.total|floatformat:2 }}</td>
+                            <td class="text-end">
+                                {% widthratio item.total total_expenses 100 %}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Fechamentos do Período -->
+    {% if closings %}
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-calendar-check"></i> Fechamentos Diários ({{ closings.count }})</h4>
+        </div>
+    </div>
+
+    <!-- Mobile: Cards -->
+    <div class="d-md-none mb-4">
+        {% for closing in closings %}
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <div class="row align-items-center g-2">
+                    <div class="col-12">
+                        <strong>{{ closing.date|date:"d/m/Y" }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Pedidos:</small> {{ closing.order_count }}
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Vendas:</small>
+                        <span class="text-success">R$ {{ closing.total_sales|floatformat:2 }}</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Ticket Médio:</small> R$ {{ closing.average_ticket|floatformat:2 }}
+                    </div>
+                    <div class="col-6 text-end">
+                        <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop: Tabela -->
+    <div class="d-none d-md-block mb-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th class="text-end">Pedidos</th>
+                                <th class="text-end">Dinheiro</th>
+                                <th class="text-end">PIX</th>
+                                <th class="text-end">Cartão</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Ticket Médio</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for closing in closings %}
+                            <tr>
+                                <td>{{ closing.date|date:"d/m/Y" }}</td>
+                                <td class="text-end">{{ closing.order_count }}</td>
+                                <td class="text-end">R$ {{ closing.cash_sales|floatformat:2 }}</td>
+                                <td class="text-end">R$ {{ closing.pix_sales|floatformat:2 }}</td>
+                                <td class="text-end">R$ {{ closing.card_sales|floatformat:2 }}</td>
+                                <td class="text-end fw-bold text-success">R$ {{ closing.total_sales|floatformat:2 }}</td>
+                                <td class="text-end">R$ {{ closing.average_ticket|floatformat:2 }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Despesas do Período -->
+    {% if expenses %}
+    <div class="row mb-3">
+        <div class="col">
+            <h4 class="mb-3"><i class="bi bi-receipt"></i> Despesas Detalhadas ({{ expenses.count }})</h4>
+        </div>
+    </div>
+
+    <!-- Mobile: Cards -->
+    <div class="d-md-none mb-4">
+        {% for expense in expenses %}
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <div class="row align-items-center g-2">
+                    <div class="col-12">
+                        <strong>{{ expense.date|date:"d/m/Y" }}</strong> - {{ expense.category.name }}
+                    </div>
+                    <div class="col-8">
+                        <small class="text-muted">{{ expense.description|truncatewords:10 }}</small>
+                    </div>
+                    <div class="col-4 text-end">
+                        <span class="text-danger fw-bold">R$ {{ expense.amount|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop: Tabela -->
+    <div class="d-none d-md-block mb-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Categoria</th>
+                                <th>Descrição</th>
+                                <th class="text-end">Valor</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in expenses %}
+                            <tr>
+                                <td>{{ expense.date|date:"d/m/Y" }}</td>
+                                <td>{{ expense.category.name }}</td>
+                                <td>{{ expense.description|truncatewords:15 }}</td>
+                                <td class="text-end text-danger fw-bold">R$ {{ expense.amount|floatformat:2 }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not closings and not expenses %}
+    <div class="alert alert-warning">
+        <i class="bi bi-info-circle"></i> Nenhum dado encontrado para o período selecionado.
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCustomDates() {
+    const periodSelect = document.querySelector('select[name="period"]');
+    const customDates = document.getElementById('custom-dates');
+    const customDatesEnd = document.getElementById('custom-dates-end');
+
+    if (periodSelect.value === 'custom') {
+        customDates.style.display = 'block';
+        customDatesEnd.style.display = 'block';
+    } else {
+        customDates.style.display = 'none';
+        customDatesEnd.style.display = 'none';
+    }
+}
+
+// Executar ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    toggleCustomDates();
+});
+</script>
+{% endblock %}

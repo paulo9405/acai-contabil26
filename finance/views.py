@@ -12,11 +12,11 @@ from django.utils import timezone
 from datetime import timedelta
 
 from finance.models import Expense, ExpenseCategory, DailyClosing
-from finance.forms import ExpenseForm, ExpenseFilterForm, DailyClosingForm
+from finance.forms import ExpenseForm, ExpenseFilterForm, DailyClosingForm, ReportFilterForm
 from finance.services import (
     create_expense, update_expense, create_daily_closing, update_daily_closing,
     get_dashboard_metrics, calculate_period_sales, calculate_period_expenses,
-    calculate_period_profit
+    calculate_period_profit, calculate_period_orders, calculate_period_average_ticket
 )
 
 
@@ -96,6 +96,126 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
 
         return context
+
+
+# ============================================================================
+# REPORT VIEW
+# ============================================================================
+
+class ReportView(LoginRequiredMixin, TemplateView):
+    """
+    Relatórios financeiros com filtros por período.
+    Exibe resumo de vendas, despesas, lucro e listagem detalhada.
+    """
+    template_name = 'finance/report.html'
+
+    def get_context_data(self, **kwargs):
+        """
+        Processa filtros e retorna dados do relatório.
+        """
+        context = super().get_context_data(**kwargs)
+
+        # Processar formulário de filtro
+        form = ReportFilterForm(self.request.GET or {'period': 'this_month'})
+        context['form'] = form
+
+        if form.is_valid():
+            # Calcular datas baseado no período
+            start_date, end_date = self._calculate_period_dates(
+                form.cleaned_data['period'],
+                form.cleaned_data.get('start_date'),
+                form.cleaned_data.get('end_date')
+            )
+
+            context['start_date'] = start_date
+            context['end_date'] = end_date
+            context['period_label'] = dict(form.fields['period'].choices)[form.cleaned_data['period']]
+
+            # Calcular métricas usando services
+            context['total_sales'] = calculate_period_sales(
+                start_date=start_date,
+                end_date=end_date
+            )
+            context['total_expenses'] = calculate_period_expenses(
+                start_date=start_date,
+                end_date=end_date
+            )
+            context['total_profit'] = calculate_period_profit(
+                start_date=start_date,
+                end_date=end_date
+            )
+            context['total_orders'] = calculate_period_orders(
+                start_date=start_date,
+                end_date=end_date
+            )
+            context['average_ticket'] = calculate_period_average_ticket(
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            # Buscar fechamentos do período
+            closings = DailyClosing.objects.filter(
+                date__gte=start_date,
+                date__lte=end_date
+            ).order_by('-date')
+            context['closings'] = closings
+
+            # Buscar despesas do período
+            expenses = Expense.objects.filter(
+                date__gte=start_date,
+                date__lte=end_date
+            ).select_related('category').order_by('-date', '-id')
+            context['expenses'] = expenses
+
+            # Despesas por categoria
+            expenses_by_category = Expense.objects.filter(
+                date__gte=start_date,
+                date__lte=end_date
+            ).values('category__name').annotate(
+                total=models.Sum('amount')
+            ).order_by('-total')
+            context['expenses_by_category'] = expenses_by_category
+
+        return context
+
+    def _calculate_period_dates(self, period, custom_start, custom_end):
+        """
+        Calcula as datas de início e fim baseado no período selecionado.
+        """
+        today = timezone.now().date()
+
+        if period == 'today':
+            return today, today
+
+        elif period == 'yesterday':
+            yesterday = today - timedelta(days=1)
+            return yesterday, yesterday
+
+        elif period == 'last_7_days':
+            start = today - timedelta(days=6)
+            return start, today
+
+        elif period == 'last_30_days':
+            start = today - timedelta(days=29)
+            return start, today
+
+        elif period == 'this_month':
+            start = today.replace(day=1)
+            return start, today
+
+        elif period == 'last_month':
+            # Primeiro dia do mês passado
+            first_this_month = today.replace(day=1)
+            last_day_last_month = first_this_month - timedelta(days=1)
+            first_last_month = last_day_last_month.replace(day=1)
+            return first_last_month, last_day_last_month
+
+        elif period == 'custom':
+            return custom_start, custom_end
+
+        # Default: este mês
+        start = today.replace(day=1)
+        return start, today
 
 
 # ============================================================================
