@@ -193,6 +193,27 @@
             opacity: 0.3;
         }
 
+        /* Logout button styling */
+        .logout-form {
+            margin: 0;
+            padding: 0;
+        }
+
+        .logout-button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            padding: 0;
+            font: inherit;
+            color: inherit;
+        }
+
+        .logout-button:hover {
+            background-color: var(--bs-dropdown-link-hover-bg, #f8f9fa);
+        }
+
         /* Breadcrumbs */
         .breadcrumb {
             background-color: transparent;
@@ -326,7 +347,14 @@
                                 <li><a class="dropdown-item" href="/admin/"><i class="bi bi-gear"></i> Admin</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 {% endif %}
-                                <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+                                <li>
+                                    <form method="post" action="{% url 'logout' %}" class="logout-form">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item logout-button">
+                                            <i class="bi bi-box-arrow-right"></i> Sair
+                                        </button>
+                                    </form>
+                                </li>
                             </ul>
                         </li>
                     {% else %}
