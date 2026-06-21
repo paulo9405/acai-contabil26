@@ -155,13 +155,21 @@
         {% endif %}
 
     {% else %}
-        <!-- Nenhum fechamento -->
-        <div class="alert alert-warning text-center">
-            <i class="bi bi-info-circle"></i> Nenhum fechamento encontrado.
-            <br>
-            <a href="{% url 'closing-create' %}" class="btn btn-primary btn-sm mt-2">
-                <i class="bi bi-plus-circle"></i> Registrar primeiro fechamento
-            </a>
+        <!-- Empty State -->
+        <div class="card text-center py-5">
+            <div class="card-body">
+                <div class="mb-4">
+                    <i class="bi bi-calendar-x" style="font-size: 4rem; color: #6c757d; opacity: 0.5;"></i>
+                </div>
+                <h4 class="mb-3">Nenhum fechamento registrado</h4>
+                <p class="text-muted mb-4">
+                    Você ainda não registrou nenhum fechamento diário.<br>
+                    Comece registrando o fechamento de hoje para acompanhar suas vendas.
+                </p>
+                <a href="{% url 'closing-create' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-plus-circle"></i> Registrar Primeiro Fechamento
+                </a>
+            </div>
         </div>
     {% endif %}
 </div>

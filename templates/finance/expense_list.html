@@ -179,13 +179,33 @@
         {% endif %}
 
     {% else %}
-        <!-- Nenhuma despesa -->
-        <div class="alert alert-warning text-center">
-            <i class="bi bi-info-circle"></i> Nenhuma despesa encontrada.
-            <br>
-            <a href="{% url 'expense-create' %}" class="btn btn-success btn-sm mt-2">
-                <i class="bi bi-plus-circle"></i> Registrar primeira despesa
-            </a>
+        <!-- Empty State -->
+        <div class="card text-center py-5">
+            <div class="card-body">
+                <div class="mb-4">
+                    <i class="bi bi-inbox" style="font-size: 4rem; color: #6c757d; opacity: 0.5;"></i>
+                </div>
+                <h4 class="mb-3">Nenhuma despesa encontrada</h4>
+                <p class="text-muted mb-4">
+                    {% if request.GET.date_from or request.GET.date_to or request.GET.category %}
+                        Nenhuma despesa corresponde aos filtros selecionados.<br>
+                        Tente ajustar os filtros ou limpar para ver todas as despesas.
+                    {% else %}
+                        Você ainda não registrou nenhuma despesa.<br>
+                        Comece registrando sua primeira despesa para controlar seus gastos.
+                    {% endif %}
+                </p>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="{% url 'expense-create' %}" class="btn btn-success btn-lg">
+                        <i class="bi bi-plus-circle"></i> Registrar Despesa
+                    </a>
+                    {% if request.GET.date_from or request.GET.date_to or request.GET.category %}
+                    <a href="{% url 'expense-list' %}" class="btn btn-outline-secondary btn-lg">
+                        <i class="bi bi-x-circle"></i> Limpar Filtros
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     {% endif %}
 </div>

@@ -2,6 +2,18 @@
 
 {% block title %}{{ title }} - Gestão Financeira{% endblock %}
 
+{% block breadcrumb %}
+<div class="container">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'closing-list' %}">Fechamentos</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+        </ol>
+    </nav>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <!-- Header -->

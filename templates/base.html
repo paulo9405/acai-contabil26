@@ -18,6 +18,7 @@
         :root {
             /* Mobile-first: otimizado para 390px */
             --min-touch-target: 48px;
+            --spacing-unit: 1rem;
         }
 
         body {
@@ -28,6 +29,43 @@
         /* Botões grandes para mobile */
         .btn-lg {
             min-height: var(--min-touch-target);
+            padding: 0.75rem 1.5rem;
+        }
+
+        .btn, .btn-sm {
+            min-height: 44px; /* WCAG minimum */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* Melhor espaçamento em mobile */
+        @media (max-width: 767px) {
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .card {
+                margin-bottom: 1rem;
+            }
+
+            /* Aumentar área de toque para links */
+            .nav-link {
+                padding: 0.75rem 1rem;
+            }
+
+            /* Melhor espaçamento entre elementos de formulário */
+            .form-control, .form-select {
+                font-size: 16px; /* Previne zoom no iOS */
+                min-height: 48px;
+            }
+
+            /* Gap entre botões */
+            .d-grid.gap-2 {
+                gap: 0.75rem !important;
+            }
         }
 
         /* Cards com espaçamento adequado */
@@ -86,6 +124,161 @@
             border-radius: 0.5rem;
             padding: 1rem;
             margin-bottom: 1rem;
+        }
+
+        /* Form improvements */
+        .form-control.is-invalid, .form-select.is-invalid {
+            border-color: #dc3545;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+
+        .invalid-feedback {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.875rem;
+            color: #dc3545;
+        }
+
+        .errorlist {
+            list-style: none;
+            padding: 0;
+            margin: 0.25rem 0 0.5rem 0;
+            color: #dc3545;
+            font-size: 0.875rem;
+        }
+
+        .errorlist li {
+            padding: 0.25rem 0;
+        }
+
+        .errorlist li::before {
+            content: "⚠ ";
+            margin-right: 0.25rem;
+        }
+
+        /* Loading state */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.65;
+        }
+
+        .btn-loading::after {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spinner 0.6s linear infinite;
+        }
+
+        @keyframes spinner {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty states */
+        .empty-state-icon {
+            font-size: 4rem;
+            color: #6c757d;
+            opacity: 0.3;
+        }
+
+        /* Breadcrumbs */
+        .breadcrumb {
+            background-color: transparent;
+            padding: 0.75rem 0;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .breadcrumb-item a {
+            text-decoration: none;
+            color: #6c757d;
+        }
+
+        .breadcrumb-item a:hover {
+            color: #0d6efd;
+            text-decoration: underline;
+        }
+
+        .breadcrumb-item.active {
+            color: #212529;
+        }
+
+        /* Smooth transitions */
+        .btn, .card, .form-control, .form-select {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card:hover {
+            box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+        }
+
+        /* Badge improvements */
+        .badge {
+            font-weight: 500;
+            padding: 0.35em 0.65em;
+        }
+
+        /* Table improvements */
+        .table-hover tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
+        }
+
+        /* Alert improvements */
+        .alert {
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            border-left-color: #198754;
+        }
+
+        .alert-danger {
+            border-left-color: #dc3545;
+        }
+
+        .alert-warning {
+            border-left-color: #ffc107;
+        }
+
+        .alert-info {
+            border-left-color: #0dcaf0;
+        }
+
+        /* Focus states */
+        .btn:focus, .form-control:focus, .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+
+        /* Pagination improvements */
+        .pagination {
+            margin-top: 1.5rem;
+        }
+
+        .page-link {
+            color: #0d6efd;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .page-link:hover {
+            transform: translateY(-1px);
         }
     </style>
 
@@ -162,6 +355,9 @@
 
     <!-- Main Content -->
     <main class="container-fluid py-4">
+        <!-- Breadcrumbs -->
+        {% block breadcrumb %}{% endblock %}
+
         {% block content %}{% endblock %}
     </main>
 
@@ -197,6 +393,61 @@
                 secondary: '#6c757d'
             };
         }
+    </script>
+
+    <!-- Global UX Enhancements -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Loading state para formulários
+            const forms = document.querySelectorAll('form:not([data-no-loading])');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn && !submitBtn.classList.contains('btn-loading')) {
+                        submitBtn.classList.add('btn-loading');
+                        submitBtn.disabled = true;
+
+                        // Re-enable after 5 seconds (fallback)
+                        setTimeout(function() {
+                            submitBtn.classList.remove('btn-loading');
+                            submitBtn.disabled = false;
+                        }, 5000);
+                    }
+                });
+            });
+
+            // Confirmação para links de exclusão
+            const deleteLinks = document.querySelectorAll('a[href*="delete"]');
+            deleteLinks.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    if (!confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.')) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
+            });
+
+            // Auto-hide messages após 5 segundos
+            const alerts = document.querySelectorAll('.messages .alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000);
+            });
+
+            // Adicionar classe is-invalid aos campos com erro
+            const errorInputs = document.querySelectorAll('.errorlist');
+            errorInputs.forEach(function(errorList) {
+                const formGroup = errorList.closest('.col-12, .col-md-4, .col-md-6, .row');
+                if (formGroup) {
+                    const input = formGroup.querySelector('input, select, textarea');
+                    if (input) {
+                        input.classList.add('is-invalid');
+                    }
+                }
+            });
+        });
     </script>
 
     {% block extra_js %}{% endblock %}
