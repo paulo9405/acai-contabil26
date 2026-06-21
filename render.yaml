@@ -1,0 +1,26 @@
+services:
+  # Web Service
+  - type: web
+    name: gestao-financeira
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn gestao_financeira.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: 4
+
+  # PostgreSQL Database
+databases:
+  - name: gestao-financeira-db
+    plan: free
+    databaseName: gestao_financeira
+    user: gestao_financeira_user
