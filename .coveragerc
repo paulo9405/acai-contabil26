@@ -1,0 +1,24 @@
+[run]
+source = finance,gestao_financeira
+omit =
+    */migrations/*
+    */tests/*
+    */test_*.py
+    */__init__.py
+    */manage.py
+    */asgi.py
+    */wsgi.py
+    */settings.py
+    */venv/*
+    */env/*
+    */admin.py
+    */apps.py
+    */management/commands/*
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov
