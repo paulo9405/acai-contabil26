@@ -95,6 +95,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             end_date=today
         )
 
+        # Despesas por categoria do mês para gráfico
+        first_day_month = today.replace(day=1)
+        expenses_by_category = Expense.objects.filter(
+            date__gte=first_day_month,
+            date__lte=today
+        ).values('category__name').annotate(
+            total=models.Sum('amount')
+        ).order_by('-total')[:10]  # Top 10 categorias
+        context['expenses_by_category'] = expenses_by_category
+
         return context
 
 
@@ -175,6 +185,36 @@ class ReportView(LoginRequiredMixin, TemplateView):
                 total=models.Sum('amount')
             ).order_by('-total')
             context['expenses_by_category'] = expenses_by_category
+
+            # Dados diários para gráficos (limitado a 31 dias para performance)
+            days_diff = (end_date - start_date).days + 1
+            if days_diff <= 31:
+                daily_data = []
+                current_date = start_date
+                while current_date <= end_date:
+                    # Vendas do dia
+                    try:
+                        closing = DailyClosing.objects.get(date=current_date)
+                        sales = closing.total_sales
+                    except DailyClosing.DoesNotExist:
+                        sales = 0
+
+                    # Despesas do dia
+                    expenses_sum = Expense.objects.filter(
+                        date=current_date
+                    ).aggregate(total=models.Sum('amount'))['total'] or 0
+
+                    daily_data.append({
+                        'date': current_date,
+                        'date_str': current_date.strftime('%d/%m'),
+                        'sales': float(sales),
+                        'expenses': float(expenses_sum),
+                        'profit': float(sales - expenses_sum)
+                    })
+
+                    current_date += timedelta(days=1)
+
+                context['daily_data'] = daily_data
 
         return context
 

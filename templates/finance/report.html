@@ -122,6 +122,34 @@
         </div>
     </div>
 
+    <!-- Gráficos do Período -->
+    {% if daily_data %}
+    <div class="row mb-4">
+        <!-- Gráfico de Barras - Vendas vs Despesas -->
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-bar-chart"></i> Vendas vs Despesas por Dia</h5>
+                    <div class="chart-container">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Gráfico de Pizza - Despesas por Categoria -->
+        <div class="col-12 col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-pie-chart"></i> Distribuição de Despesas</h5>
+                    <div class="chart-container">
+                        <canvas id="expensePieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Despesas por Categoria -->
     {% if expenses_by_category %}
     <div class="row mb-3">
@@ -336,4 +364,147 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleCustomDates();
 });
 </script>
+
+{% if daily_data %}
+<script>
+    // Gráfico de Barras - Vendas vs Despesas Diárias
+    const dailyCtx = document.getElementById('dailyChart');
+    if (dailyCtx) {
+        const dailyChartData = {
+            labels: [
+                {% for day in daily_data %}
+                    '{{ day.date_str }}'{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            datasets: [
+                {
+                    label: 'Vendas',
+                    data: [
+                        {% for day in daily_data %}
+                            {{ day.sales }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                    borderColor: chartColors.success,
+                    borderWidth: 1
+                },
+                {
+                    label: 'Despesas',
+                    data: [
+                        {% for day in daily_data %}
+                            {{ day.expenses }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                    borderColor: chartColors.danger,
+                    borderWidth: 1
+                }
+            ]
+        };
+
+        new Chart(dailyCtx, {
+            type: 'bar',
+            data: dailyChartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += 'R$ ' + context.parsed.y.toFixed(2);
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toFixed(0);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Pizza - Despesas por Categoria
+    const expensePieCtx = document.getElementById('expensePieChart');
+    if (expensePieCtx) {
+        const pieColors = [
+            '#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997',
+            '#0dcaf0', '#0d6efd', '#6610f2', '#d63384', '#6c757d'
+        ];
+
+        const expensePieData = {
+            labels: [
+                {% for item in expenses_by_category %}
+                    '{{ item.category__name }}'{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            datasets: [{
+                data: [
+                    {% for item in expenses_by_category %}
+                        {{ item.total|floatformat:2 }}{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                backgroundColor: pieColors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        };
+
+        new Chart(expensePieCtx, {
+            type: 'doughnut',
+            data: expensePieData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 8,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += 'R$ ' + context.parsed.toFixed(2);
+
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percent = ((context.parsed / total) * 100).toFixed(1);
+                                label += ' (' + percent + '%)';
+
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endif %}
 {% endblock %}
