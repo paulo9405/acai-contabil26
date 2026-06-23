@@ -30,6 +30,11 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
+# CSRF Trusted Origins (required for Render)
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+]
+
 
 # Application definition
 
@@ -79,16 +84,32 @@ WSGI_APPLICATION = 'gestao_financeira.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# Render provides DATABASE_URL automatically for PostgreSQL
-database_url = os.environ.get('DATABASE_URL')
+# CRITICAL: Detect production environment
+IS_RENDER = os.environ.get('RENDER', False)
 
-if database_url:
-    # Production: Use DATABASE_URL from Render
+# PRODUCTION: PostgreSQL is MANDATORY
+if IS_RENDER or not DEBUG:
+    database_url = os.environ.get('DATABASE_URL')
+
+    if not database_url:
+        raise RuntimeError(
+            "❌ ERRO CRÍTICO: DATABASE_URL não configurado em produção!\n"
+            "O sistema não pode usar SQLite em produção.\n"
+            "Verifique a configuração do render.yaml e as variáveis de ambiente."
+        )
+
+    # Use PostgreSQL from Render
     DATABASES = {
-        'default': dj_database_url.parse(database_url, conn_max_age=600)
+        'default': dj_database_url.parse(
+            database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
+
+# DEVELOPMENT: Allow local PostgreSQL or SQLite
 elif config('USE_POSTGRES', default=False, cast=bool):
-    # Local PostgreSQL
+    # Local PostgreSQL for development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -100,7 +121,7 @@ elif config('USE_POSTGRES', default=False, cast=bool):
         }
     }
 else:
-    # SQLite for local development
+    # SQLite ONLY for local development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -162,6 +183,40 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Set to DEBUG to see SQL queries
+            'propagate': False,
+        },
+    },
+}
+
 # Authentication settings
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
@@ -174,8 +229,8 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
     CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
 
-    # HSTS Settings
-    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    # HSTS Settings (HTTP Strict Transport Security)
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
     SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
 
@@ -183,3 +238,7 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # Additional security headers
+    SECURE_REFERRER_POLICY = 'same-origin'
