@@ -1,131 +1,139 @@
 {% extends 'base.html' %}
 
-{% block title %}Fechamentos Diários - Gestão Financeira{% endblock %}
+{% block title %}{{ NAV_HISTORICO }} — Gestão Financeira{% endblock %}
 
 {% block content %}
 <div class="container">
-    <!-- Header -->
-    <div class="row mb-4">
+
+    <!-- CABEÇALHO -->
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="h3 mb-3"><i class="bi bi-calendar-check"></i> Fechamentos Diários</h1>
+            <h1 class="h3 mb-0">{{ NAV_HISTORICO }}</h1>
+            <p class="text-muted mb-0 mt-1 small">Clique em qualquer dia para abrir ou editar</p>
         </div>
     </div>
 
-    <!-- Ação Rápida -->
-    <div class="row mb-4">
-        <div class="col">
-            <a href="{% url 'closing-create' %}" class="btn btn-primary btn-lg w-100">
-                <i class="bi bi-plus-circle"></i> Novo Fechamento
-            </a>
-        </div>
-    </div>
+    {% if enriched_closings %}
 
-    <!-- Lista de Fechamentos -->
-    {% if closings %}
-        <!-- Mobile View (cards) -->
+        <!-- ============================================================ -->
+        <!-- MOBILE: cards empilhados                                     -->
+        <!-- ============================================================ -->
         <div class="d-md-none">
-            {% for closing in closings %}
-            <div class="card mb-3">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-calendar3"></i> {{ closing.date|date:"d/m/Y" }}</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <small class="text-muted">Pedidos</small>
-                            <p class="mb-0 fw-bold">{{ closing.order_count }}</p>
+            {% for item in enriched_closings %}
+            <div class="card mb-3 border-0 shadow-sm"
+                 style="cursor:pointer"
+                 onclick="window.location.href='{% url 'daily-closing' item.date_str %}'">
+                <div class="card-body py-3">
+
+                    <!-- Linha 1: data + resultado -->
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="fw-semibold">{{ item.closing.date|date:"d/m/Y" }}</span>
+                            {% if item.is_today %}
+                            <span class="badge bg-primary ms-2">Hoje</span>
+                            {% endif %}
                         </div>
-                        <div class="col-6">
-                            <small class="text-muted">Ticket Médio</small>
-                            <p class="mb-0 fw-bold">R$ {{ closing.average_ticket|floatformat:2 }}</p>
+                        <span class="fw-bold fs-5 {% if item.result >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ item.result|floatformat:2 }}
+                        </span>
+                    </div>
+
+                    <!-- Linha 2: vendas e despesas -->
+                    <div class="d-flex gap-4">
+                        <div>
+                            <small class="text-muted d-block">Vendas</small>
+                            <span class="text-success fw-medium">R$ {{ item.closing.total_sales|floatformat:2 }}</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">Despesas</small>
+                            <span class="text-danger fw-medium">R$ {{ item.expense_total|floatformat:2 }}</span>
+                        </div>
+                        <div class="ms-auto text-end">
+                            <small class="text-muted d-block">Pedidos</small>
+                            <span class="fw-medium">{{ item.closing.order_count }}</span>
                         </div>
                     </div>
-                    <hr>
-                    <div class="row mb-2">
-                        <div class="col-4">
-                            <small class="text-muted">Dinheiro</small>
-                            <p class="mb-0">R$ {{ closing.cash_sales }}</p>
-                        </div>
-                        <div class="col-4">
-                            <small class="text-muted">Pix</small>
-                            <p class="mb-0">R$ {{ closing.pix_sales }}</p>
-                        </div>
-                        <div class="col-4">
-                            <small class="text-muted">Cartão</small>
-                            <p class="mb-0">R$ {{ closing.card_sales }}</p>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="mb-3">
-                        <small class="text-muted">Total de Vendas</small>
-                        <h4 class="mb-0 text-success">R$ {{ closing.total_sales }}</h4>
-                    </div>
-                    {% if closing.notes %}
-                    <p class="card-text mb-2">
-                        <small><i class="bi bi-info-circle"></i> {{ closing.notes|truncatewords:15 }}</small>
-                    </p>
-                    {% endif %}
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i> Editar
-                        </a>
-                        {% if user.is_superuser %}
-                        <a href="{% url 'closing-delete' closing.pk %}" class="btn btn-sm btn-outline-danger">
+
+                    {% if user.is_superuser %}
+                    <div class="mt-2 text-end">
+                        <a href="{% url 'closing-delete' item.closing.pk %}"
+                           class="text-danger small text-decoration-none"
+                           onclick="event.stopPropagation()"
+                           aria-label="Excluir fechamento de {{ item.closing.date|date:'d/m/Y' }}">
                             <i class="bi bi-trash"></i> Excluir
                         </a>
-                        {% endif %}
                     </div>
+                    {% endif %}
+
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Desktop View (table) -->
+        <!-- ============================================================ -->
+        <!-- DESKTOP: tabela clicável                                      -->
+        <!-- ============================================================ -->
         <div class="d-none d-md-block">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Pedidos</th>
-                            <th>Dinheiro</th>
-                            <th>Pix</th>
-                            <th>Cartão</th>
-                            <th>Total</th>
-                            <th>Ticket Médio</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for closing in closings %}
-                        <tr>
-                            <td>{{ closing.date|date:"d/m/Y" }}</td>
-                            <td>{{ closing.order_count }}</td>
-                            <td>R$ {{ closing.cash_sales }}</td>
-                            <td>R$ {{ closing.pix_sales }}</td>
-                            <td>R$ {{ closing.card_sales }}</td>
-                            <td class="fw-bold text-success">R$ {{ closing.total_sales }}</td>
-                            <td>R$ {{ closing.average_ticket|floatformat:2 }}</td>
-                            <td class="text-end">
-                                <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
+            <div class="card shadow-sm border-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-3">Data</th>
+                                <th class="text-end">Vendas</th>
+                                <th class="text-end">Despesas</th>
+                                <th class="text-end">Resultado</th>
+                                <th class="text-center">Pedidos</th>
+                                <th class="text-end pe-4">Ticket Médio</th>
+                                {% if user.is_superuser %}<th></th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in enriched_closings %}
+                            <tr style="cursor:pointer"
+                                onclick="window.location.href='{% url 'daily-closing' item.date_str %}'">
+                                <td class="ps-4 py-3 fw-semibold">
+                                    {{ item.closing.date|date:"d/m/Y" }}
+                                    {% if item.is_today %}
+                                    <span class="badge bg-primary ms-1">Hoje</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-success fw-medium">
+                                    R$ {{ item.closing.total_sales|floatformat:2 }}
+                                </td>
+                                <td class="text-end text-danger">
+                                    R$ {{ item.expense_total|floatformat:2 }}
+                                </td>
+                                <td class="text-end fw-bold {% if item.result >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    R$ {{ item.result|floatformat:2 }}
+                                </td>
+                                <td class="text-center">
+                                    {{ item.closing.order_count }}
+                                </td>
+                                <td class="text-end pe-4 text-muted">
+                                    R$ {{ item.closing.average_ticket|floatformat:2 }}
+                                </td>
                                 {% if user.is_superuser %}
-                                <a href="{% url 'closing-delete' closing.pk %}" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </a>
+                                <td class="text-center pe-3" onclick="event.stopPropagation()">
+                                    <a href="{% url 'closing-delete' item.closing.pk %}"
+                                       class="btn btn-outline-danger btn-sm"
+                                       aria-label="Excluir fechamento de {{ item.closing.date|date:'d/m/Y' }}"
+                                       title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
                                 {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- Paginação -->
+        <!-- PAGINAÇÃO -->
         {% if is_paginated %}
-        <nav aria-label="Navegação de páginas">
+        <nav aria-label="Navegação de páginas" class="mt-4">
             <ul class="pagination justify-content-center">
                 {% if page_obj.has_previous %}
                 <li class="page-item">
@@ -135,13 +143,11 @@
                     <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
                 </li>
                 {% endif %}
-
                 <li class="page-item active">
                     <span class="page-link">
                         Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
                     </span>
                 </li>
-
                 {% if page_obj.has_next %}
                 <li class="page-item">
                     <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
@@ -155,22 +161,20 @@
         {% endif %}
 
     {% else %}
-        <!-- Empty State -->
-        <div class="card text-center py-5">
+        <!-- ESTADO VAZIO -->
+        <div class="card text-center py-5 border-0 shadow-sm">
             <div class="card-body">
-                <div class="mb-4">
-                    <i class="bi bi-calendar-x" style="font-size: 4rem; color: #6c757d; opacity: 0.5;"></i>
-                </div>
-                <h4 class="mb-3">Nenhum fechamento registrado</h4>
+                <i class="bi bi-calendar-x mb-4 d-block" style="font-size:3.5rem;color:#6c757d;opacity:.3"></i>
+                <h4 class="mb-2">Nenhum fechamento registrado ainda</h4>
                 <p class="text-muted mb-4">
-                    Você ainda não registrou nenhum fechamento diário.<br>
-                    Comece registrando o fechamento de hoje para acompanhar suas vendas.
+                    Quando você salvar o primeiro Fechamento do Dia, ele aparecerá aqui.
                 </p>
-                <a href="{% url 'closing-create' %}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-plus-circle"></i> Registrar Primeiro Fechamento
+                <a href="{% url 'daily-closing-today' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-calendar-check"></i> Ir para Fechamento do Dia
                 </a>
             </div>
         </div>
     {% endif %}
+
 </div>
 {% endblock %}

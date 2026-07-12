@@ -6,7 +6,7 @@
 <div class="container">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{{ NAV_INICIO }}</a></li>
             <li class="breadcrumb-item"><a href="{% url 'expense-list' %}">Despesas</a></li>
             <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
         </ol>
@@ -115,13 +115,6 @@
                 </div>
             </div>
 
-            <!-- Dica -->
-            <div class="alert alert-info mt-3">
-                <small>
-                    <i class="bi bi-lightbulb"></i>
-                    <strong>Dica:</strong> Preencha todos os campos obrigatórios. A descrição é opcional.
-                </small>
-            </div>
         </div>
     </div>
 </div>

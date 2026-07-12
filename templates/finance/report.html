@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block title %}Relatórios - Gestão Financeira{% endblock %}
 
@@ -99,12 +100,12 @@
             </div>
         </div>
 
-        <!-- Lucro -->
+        <!-- Resultado -->
         <div class="col-6 col-md-6 col-lg">
-            <div class="card text-center {% if total_profit >= 0 %}border-primary{% else %}border-warning{% endif %}">
+            <div class="card text-center {% if total_profit >= 0 %}border-primary{% else %}border-danger{% endif %}">
                 <div class="card-body">
-                    <small class="text-muted d-block">Lucro Líquido</small>
-                    <h3 class="mb-0 {% if total_profit >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                    <small class="text-muted d-block">Resultado</small>
+                    <h3 class="mb-0 {% if total_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
                         R$ {{ total_profit|floatformat:2 }}
                     </h3>
                 </div>
@@ -214,9 +215,13 @@
                         <small class="text-muted">Ticket Médio:</small> R$ {{ closing.average_ticket|floatformat:2 }}
                     </div>
                     <div class="col-6 text-end">
-                        <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                        {% with date_str=closing.date|date:"Y-m-d" %}
+                        <a href="{% url 'daily-closing' date_str %}"
+                           class="btn btn-sm btn-outline-primary"
+                           aria-label="Abrir fechamento de {{ closing.date|date:'d/m/Y' }}">
                             <i class="bi bi-pencil"></i>
                         </a>
+                        {% endwith %}
                     </div>
                 </div>
             </div>
@@ -253,9 +258,13 @@
                                 <td class="text-end fw-bold text-success">R$ {{ closing.total_sales|floatformat:2 }}</td>
                                 <td class="text-end">R$ {{ closing.average_ticket|floatformat:2 }}</td>
                                 <td class="text-center">
-                                    <a href="{% url 'closing-edit' closing.pk %}" class="btn btn-sm btn-outline-primary">
+                                    {% with date_str=closing.date|date:"Y-m-d" %}
+                                    <a href="{% url 'daily-closing' date_str %}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       aria-label="Abrir fechamento de {{ closing.date|date:'d/m/Y' }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
+                                    {% endwith %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -319,7 +328,8 @@
                                 <td>{{ expense.description|truncatewords:15 }}</td>
                                 <td class="text-end text-danger fw-bold">R$ {{ expense.amount|floatformat:2 }}</td>
                                 <td class="text-center">
-                                    <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <a href="{% url 'daily-closing' expense.date|date:'Y-m-d' %}" class="btn btn-sm btn-outline-primary"
+                                       title="Abrir fechamento de {{ expense.date|date:'d/m/Y' }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                 </td>
@@ -457,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function() {
             datasets: [{
                 data: [
                     {% for item in expenses_by_category %}
-                        {{ item.total|floatformat:2 }}{% if not forloop.last %},{% endif %}
+                        {{ item.total|unlocalize }}{% if not forloop.last %},{% endif %}
                     {% endfor %}
                 ],
                 backgroundColor: pieColors,

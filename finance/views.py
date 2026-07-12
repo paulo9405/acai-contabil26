@@ -2,14 +2,17 @@
 Views da aplicação finance.
 """
 
-from django.shortcuts import render, redirect
-from django.urls import reverse_lazy
+from django.shortcuts import redirect
+from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
-from django.db import models
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView, RedirectView
+from django.db import models, transaction
+from django.db.models import Subquery, OuterRef, DecimalField
+from django.db.models.functions import Coalesce
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
+from decimal import Decimal
 
 from finance.models import Expense, ExpenseCategory, DailyClosing
 from finance.forms import ExpenseForm, ExpenseFilterForm, DailyClosingForm, ReportFilterForm
@@ -32,78 +35,83 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'finance/dashboard.html'
 
     def get_context_data(self, **kwargs):
-        """
-        Adiciona métricas ao contexto.
-        """
         context = super().get_context_data(**kwargs)
+
+        today = timezone.now().date()
+
+        context['today_has_closing'] = DailyClosing.objects.filter(date=today).exists()
+        context['today_date_str'] = today.isoformat()
 
         # Métricas do dia e do mês (via service)
         dashboard_data = get_dashboard_metrics()
         context['today'] = dashboard_data['today']
         context['month'] = dashboard_data['month']
 
-        # Últimos 7 dias para visualização
-        today = timezone.now().date()
-        start_date = today - timedelta(days=6)  # 7 dias incluindo hoje
-
-        # Buscar fechamentos dos últimos 7 dias
-        closings = DailyClosing.objects.filter(
+        # Últimos 7 dias para gráfico de tendência
+        start_date = today - timedelta(days=6)
+        closings_7d = DailyClosing.objects.filter(
             date__gte=start_date,
             date__lte=today
         ).order_by('date')
 
-        # Preparar dados para os últimos 7 dias
         last_7_days = []
         for i in range(7):
             day = start_date + timedelta(days=i)
-
-            # Buscar fechamento do dia
             try:
-                closing = closings.get(date=day)
+                closing = closings_7d.get(date=day)
                 sales = closing.total_sales
             except DailyClosing.DoesNotExist:
                 sales = 0
 
-            # Buscar despesas do dia
             expenses = Expense.objects.filter(date=day).aggregate(
                 total=models.Sum('amount')
             )['total'] or 0
 
-            profit = sales - expenses
-
             last_7_days.append({
                 'date': day,
                 'date_str': day.strftime('%d/%m'),
+                'url_date': day.isoformat(),
                 'sales': sales,
                 'expenses': expenses,
-                'profit': profit,
+                'profit': sales - expenses,
             })
 
         context['last_7_days'] = last_7_days
 
-        # Totais dos últimos 7 dias
-        context['last_7_days_sales'] = calculate_period_sales(
-            start_date=start_date,
-            end_date=today
-        )
-        context['last_7_days_expenses'] = calculate_period_expenses(
-            start_date=start_date,
-            end_date=today
-        )
-        context['last_7_days_profit'] = calculate_period_profit(
-            start_date=start_date,
-            end_date=today
-        )
-
-        # Despesas por categoria do mês para gráfico
+        # Despesas por categoria do mês
         first_day_month = today.replace(day=1)
-        expenses_by_category = Expense.objects.filter(
+        context['expenses_by_category'] = Expense.objects.filter(
             date__gte=first_day_month,
             date__lte=today
         ).values('category__name').annotate(
             total=models.Sum('amount')
-        ).order_by('-total')[:10]  # Top 10 categorias
-        context['expenses_by_category'] = expenses_by_category
+        ).order_by('-total')[:8]
+
+        # Últimos fechamentos com totais de despesas
+        expense_subquery = Expense.objects.filter(
+            date=OuterRef('date')
+        ).values('date').annotate(
+            total=models.Sum('amount')
+        ).values('total')
+
+        recent_qs = DailyClosing.objects.annotate(
+            expense_total=Coalesce(
+                Subquery(expense_subquery, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Decimal('0.00'),
+                output_field=DecimalField(max_digits=10, decimal_places=2)
+            )
+        ).order_by('-date')[:5]
+
+        context['recent_closings'] = [
+            {
+                'closing': c,
+                'expense_total': c.expense_total,
+                'result': c.total_sales - c.expense_total,
+                'date_str': c.date.isoformat(),
+                'is_today': c.date == today,
+            }
+            for c in recent_qs
+        ]
 
         return context
 
@@ -401,7 +409,9 @@ class ExpenseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     """
     model = Expense
     template_name = 'finance/expense_confirm_delete.html'
-    success_url = reverse_lazy('expense-list')
+
+    def get_success_url(self):
+        return reverse('daily-closing', kwargs={'closing_date': self.object.date.isoformat()})
 
     def test_func(self):
         """
@@ -438,10 +448,35 @@ class DailyClosingListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        """
-        Retorna queryset ordenado por data (mais recente primeiro).
-        """
-        return DailyClosing.objects.all()
+        expense_subquery = Expense.objects.filter(
+            date=OuterRef('date')
+        ).values('date').annotate(
+            total=models.Sum('amount')
+        ).values('total')
+
+        return DailyClosing.objects.annotate(
+            expense_total=Coalesce(
+                Subquery(expense_subquery, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Decimal('0.00'),
+                output_field=DecimalField(max_digits=10, decimal_places=2)
+            )
+        ).order_by('-date')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.now().date()
+        enriched = []
+        for closing in context['closings']:
+            expense_total = closing.expense_total
+            enriched.append({
+                'closing': closing,
+                'expense_total': expense_total,
+                'result': closing.total_sales - expense_total,
+                'date_str': closing.date.isoformat(),
+                'is_today': closing.date == today,
+            })
+        context['enriched_closings'] = enriched
+        return context
 
 
 class DailyClosingCreateView(LoginRequiredMixin, CreateView):
@@ -560,3 +595,206 @@ class DailyClosingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView
         )
 
         return super().delete(request, *args, **kwargs)
+
+
+# ============================================================================
+# FECHAMENTO DO DIA — TELA UNIFICADA (nova arquitetura)
+# ============================================================================
+
+class DailyClosingTodayRedirectView(LoginRequiredMixin, RedirectView):
+    """
+    Redireciona /fechamento/ para a data de hoje.
+    Permite que o menu sempre aponte para um link fixo.
+    """
+    def get_redirect_url(self, *args, **kwargs):
+        today = timezone.now().date()
+        return reverse('daily-closing', kwargs={'closing_date': today.isoformat()})
+
+
+class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
+    """
+    Tela unificada de Fechamento do Dia.
+
+    Exibe vendas e despesas do dia em uma única tela.
+    Detecta automaticamente se é criação ou edição pela data.
+    Fase 2: apenas interface — lógica de salvar implementada na Fase 4.
+    """
+    template_name = 'finance/daily_closing_unified.html'
+
+    def _get_closing_date(self):
+        closing_date_str = self.kwargs.get('closing_date', '')
+        try:
+            return datetime.strptime(closing_date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return timezone.now().date()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.now().date()
+        closing_date = self._get_closing_date()
+
+        # Não permitir datas futuras — redireciona para hoje silenciosamente
+        if closing_date > today:
+            closing_date = today
+
+        try:
+            closing = DailyClosing.objects.get(date=closing_date)
+            is_edit = True
+        except DailyClosing.DoesNotExist:
+            closing = None
+            is_edit = False
+
+        expenses = Expense.objects.filter(
+            date=closing_date
+        ).select_related('category').order_by('created_at')
+
+        categories = ExpenseCategory.objects.filter(active=True)
+
+        total_expenses = Expense.objects.filter(
+            date=closing_date
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+
+        total_sales = closing.total_sales if closing else Decimal('0.00')
+        average_ticket = closing.average_ticket if closing else Decimal('0.00')
+        result = total_sales - total_expenses
+
+        # URL template para navegação de data via JS (usa PLACEHOLDER como sentinela)
+        fechamento_url_template = reverse(
+            'daily-closing', kwargs={'closing_date': 'PLACEHOLDER'}
+        )
+
+        context.update({
+            'closing_date': closing_date,
+            'today': today,
+            'closing': closing,
+            'is_edit': is_edit,
+            'expenses': expenses,
+            'categories': categories,
+            'total_expenses': total_expenses,
+            'total_sales': total_sales,
+            'average_ticket': average_ticket,
+            'result': result,
+            'prev_date_str': (closing_date - timedelta(1)).isoformat(),
+            'next_date_str': (closing_date + timedelta(1)).isoformat() if closing_date < today else None,
+            'fechamento_url_template': fechamento_url_template,
+        })
+        return context
+
+    def post(self, request, closing_date):
+        closing_date = self._get_closing_date()
+        today = timezone.now().date()
+        if closing_date > today:
+            closing_date = today
+
+        def safe_decimal(value):
+            try:
+                v = Decimal(str(value).replace(',', '.').strip())
+                return v if v >= 0 else Decimal('0.00')
+            except Exception:
+                return Decimal('0.00')
+
+        def safe_int(value):
+            try:
+                return max(0, int(str(value).strip()))
+            except Exception:
+                return 0
+
+        order_count = safe_int(request.POST.get('order_count', '0'))
+        cash_sales  = safe_decimal(request.POST.get('cash_sales',  '0'))
+        pix_sales   = safe_decimal(request.POST.get('pix_sales',   '0'))
+        card_sales  = safe_decimal(request.POST.get('card_sales',  '0'))
+        notes       = request.POST.get('notes', '').strip()
+
+        expense_ids   = request.POST.getlist('expense_id[]')
+        expense_cats  = request.POST.getlist('expense_category[]')
+        expense_descs = request.POST.getlist('expense_description[]')
+        expense_amts  = request.POST.getlist('expense_amount[]')
+
+        expense_rows = []
+        for i in range(len(expense_cats)):
+            cat_id  = expense_cats[i]  if i < len(expense_cats)  else ''
+            amt_str = expense_amts[i]  if i < len(expense_amts)  else ''
+            desc    = expense_descs[i] if i < len(expense_descs) else ''
+            exp_id  = expense_ids[i]   if i < len(expense_ids)   else ''
+
+            if not cat_id or not amt_str:
+                continue
+            amt = safe_decimal(amt_str)
+            if amt <= 0:
+                continue
+
+            expense_rows.append({
+                'id':          exp_id,
+                'category_id': cat_id,
+                'description': desc.strip(),
+                'amount':      amt,
+            })
+
+        try:
+            with transaction.atomic():
+                # 1. Criar ou atualizar DailyClosing
+                try:
+                    existing = DailyClosing.objects.get(date=closing_date)
+                    update_daily_closing(
+                        closing=existing,
+                        order_count=order_count,
+                        cash_sales=cash_sales,
+                        pix_sales=pix_sales,
+                        card_sales=card_sales,
+                        notes=notes,
+                    )
+                except DailyClosing.DoesNotExist:
+                    create_daily_closing(
+                        date=closing_date,
+                        order_count=order_count,
+                        cash_sales=cash_sales,
+                        pix_sales=pix_sales,
+                        card_sales=card_sales,
+                        notes=notes,
+                    )
+
+                # 2. Processar despesas
+                cat_cache = {
+                    str(c.id): c
+                    for c in ExpenseCategory.objects.filter(active=True)
+                }
+                kept_ids = set()
+
+                for row in expense_rows:
+                    category = cat_cache.get(str(row['category_id']))
+                    if not category:
+                        continue
+
+                    if row['id']:
+                        try:
+                            expense = Expense.objects.get(
+                                id=int(row['id']), date=closing_date
+                            )
+                            update_expense(
+                                expense=expense,
+                                category=category,
+                                amount=row['amount'],
+                                description=row['description'],
+                            )
+                            kept_ids.add(expense.id)
+                        except (Expense.DoesNotExist, ValueError):
+                            pass
+                    else:
+                        expense = create_expense(
+                            date=closing_date,
+                            category=category,
+                            amount=row['amount'],
+                            description=row['description'],
+                        )
+                        kept_ids.add(expense.id)
+
+                # 3. Remover despesas desta data que o usuário excluiu
+                Expense.objects.filter(
+                    date=closing_date
+                ).exclude(id__in=kept_ids).delete()
+
+            messages.success(request, 'Fechamento salvo com sucesso!')
+        except Exception as e:
+            messages.error(request, f'Erro ao salvar o fechamento: {e}')
+
+        return redirect('daily-closing', closing_date=closing_date.isoformat())

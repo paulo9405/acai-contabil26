@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+{% load static l10n %}
+
+{% block title %}{{ NAV_FECHAMENTO }} — {{ closing_date|date:"d/m/Y" }} — Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- NAVEGAÇÃO DE RETORNO (somente para datas históricas) -->
+    {% if closing_date != today %}
+    <div class="mb-3">
+        <a href="{% url 'closing-list' %}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> {{ NAV_HISTORICO }}
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- CABEÇALHO -->
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h1 class="h3 mb-0">{{ NAV_FECHAMENTO }}</h1>
+
+            <!-- Navegação de data -->
+            <div class="d-flex align-items-center gap-1 mt-2 flex-wrap">
+                <a href="{% url 'daily-closing' prev_date_str %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   aria-label="Dia anterior"
+                   title="Dia anterior">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+
+                <input type="date"
+                       id="nav-date"
+                       value="{{ closing_date|date:'Y-m-d' }}"
+                       max="{{ today|date:'Y-m-d' }}"
+                       data-url-template="{{ fechamento_url_template }}"
+                       class="form-control form-control-sm"
+                       style="width:auto;min-width:145px"
+                       aria-label="Selecionar data">
+
+                {% if next_date_str %}
+                <a href="{% url 'daily-closing' next_date_str %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   aria-label="Próximo dia"
+                   title="Próximo dia">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+                {% else %}
+                <button class="btn btn-outline-secondary btn-sm"
+                        disabled
+                        aria-label="Próximo dia"
+                        title="Não é possível avançar além de hoje">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+                {% endif %}
+
+                {% if closing_date != today %}
+                <a href="{% url 'daily-closing-today' %}"
+                   class="btn btn-outline-primary btn-sm ms-1">
+                    Hoje
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-auto d-flex gap-2 align-items-center mt-2 mt-sm-0">
+            {% if is_edit %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle fs-6 px-3 py-2">
+                Fechamento salvo
+            </span>
+            {% endif %}
+            {% if user.is_superuser and is_edit %}
+            <a href="{% url 'closing-delete' closing.pk %}"
+               class="btn btn-outline-danger btn-sm"
+               aria-label="Excluir fechamento de {{ closing_date|date:'d/m/Y' }}"
+               title="Excluir este fechamento">
+                <i class="bi bi-trash"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" id="fechamento-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="closing_date" value="{{ closing_date|date:'Y-m-d' }}">
+
+        <!-- ============================================================ -->
+        <!-- SEÇÃO 1: VENDAS DO DIA                                       -->
+        <!-- ============================================================ -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-semibold">Vendas do Dia</h5>
+            </div>
+            <div class="card-body pb-3">
+                <div class="row g-3">
+
+                    <!-- Pedidos -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label fw-medium">Pedidos</label>
+                        <input type="number"
+                               name="order_count"
+                               id="id_order_count"
+                               class="form-control form-control-lg text-center"
+                               value="{{ closing.order_count|default:'' }}"
+                               min="0"
+                               placeholder="0"
+                               autocomplete="off">
+                    </div>
+
+                    <!-- Dinheiro -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label fw-medium">Dinheiro</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">R$</span>
+                            <input type="number"
+                                   name="cash_sales"
+                                   id="id_cash_sales"
+                                   class="form-control"
+                                   value="{% if closing %}{{ closing.cash_sales|unlocalize }}{% endif %}"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="0,00"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+
+                    <!-- PIX -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label fw-medium">PIX</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">R$</span>
+                            <input type="number"
+                                   name="pix_sales"
+                                   id="id_pix_sales"
+                                   class="form-control"
+                                   value="{% if closing %}{{ closing.pix_sales|unlocalize }}{% endif %}"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="0,00"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+
+                    <!-- Cartão -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label fw-medium">Cartão</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">R$</span>
+                            <input type="number"
+                                   name="card_sales"
+                                   id="id_card_sales"
+                                   class="form-control"
+                                   value="{% if closing %}{{ closing.card_sales|unlocalize }}{% endif %}"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="0,00"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Totais calculados -->
+                <div class="row g-3 mt-1 pt-3 border-top">
+                    <div class="col-6">
+                        <small class="text-muted d-block mb-1">Total vendido</small>
+                        <span class="fs-4 fw-bold text-success" id="display-total-vendas">
+                            R$ {{ total_sales|floatformat:2 }}
+                        </span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block mb-1">Ticket médio</small>
+                        <span class="fs-4 fw-bold text-secondary" id="display-ticket-medio">
+                            R$ {{ average_ticket|floatformat:2 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- SEÇÃO 2: DESPESAS DO DIA                                     -->
+        <!-- ============================================================ -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-semibold">Despesas do Dia</h5>
+                <small class="text-muted">
+                    Total: <strong class="text-danger" id="display-total-despesas">
+                        R$ {{ total_expenses|floatformat:2 }}
+                    </strong>
+                </small>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="despesas-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3" style="min-width:165px">Categoria</th>
+                            <th style="min-width:160px">Descrição</th>
+                            <th class="text-end pe-2" style="min-width:130px">Valor (R$)</th>
+                            <th style="width:52px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="despesas-tbody">
+                        {% for expense in expenses %}
+                        <tr data-expense-row="1">
+                            <input type="hidden" name="expense_id[]" value="{{ expense.id }}">
+                            <td class="ps-3">
+                                <select name="expense_category[]"
+                                        class="form-select form-select-sm">
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}"
+                                            {% if cat.id == expense.category_id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text"
+                                       name="expense_description[]"
+                                       class="form-control form-control-sm"
+                                       value="{{ expense.description }}"
+                                       placeholder="Descrição (opcional)"
+                                       maxlength="200">
+                            </td>
+                            <td class="pe-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="number"
+                                           name="expense_amount[]"
+                                           class="form-control text-end expense-amount-input"
+                                           value="{{ expense.amount|unlocalize }}"
+                                           step="0.01"
+                                           min="0.01"
+                                           placeholder="0,00">
+                                </div>
+                            </td>
+                            <td class="text-center pe-2">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm btn-remover-despesa"
+                                        style="width:34px;height:34px;padding:0"
+                                        title="Remover despesa">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr id="empty-despesas-row">
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-receipt d-block mb-2" style="font-size:1.5rem;opacity:.3"></i>
+                                <small>Nenhuma despesa lançada. Clique em "+ Adicionar outra despesa" para começar.</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-footer bg-white py-3">
+                <button type="button" class="btn btn-outline-primary" id="btn-adicionar-despesa">
+                    <i class="bi bi-plus-lg"></i> Adicionar outra despesa
+                </button>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- SEÇÃO 3: RESULTADO DO DIA                                    -->
+        <!-- ============================================================ -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body py-3">
+                <div class="row text-center g-0">
+                    <div class="col-4 border-end">
+                        <small class="text-muted d-block mb-1">Vendas</small>
+                        <strong class="fs-5 text-success" id="resumo-vendas">
+                            R$ {{ total_sales|floatformat:2 }}
+                        </strong>
+                    </div>
+                    <div class="col-4 border-end">
+                        <small class="text-muted d-block mb-1">Despesas</small>
+                        <strong class="fs-5 text-danger" id="resumo-despesas">
+                            R$ {{ total_expenses|floatformat:2 }}
+                        </strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted d-block mb-1">Resultado</small>
+                        <strong class="fs-5 {% if result >= 0 %}text-primary{% else %}text-danger{% endif %}"
+                                id="resumo-resultado">
+                            R$ {{ result|floatformat:2 }}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- BOTÃO SALVAR                                                  -->
+        <!-- ============================================================ -->
+        <div class="d-grid mb-3">
+            <button type="submit" class="btn btn-primary btn-lg py-3 fw-semibold">
+                <i class="bi bi-check-circle"></i> Salvar Fechamento do Dia
+            </button>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- OBSERVAÇÃO (colapsável)                                       -->
+        <!-- ============================================================ -->
+        <div class="text-center mb-5">
+            <a href="#observacao-collapse"
+               class="text-muted small text-decoration-none"
+               data-bs-toggle="collapse"
+               aria-expanded="{% if closing.notes %}true{% else %}false{% endif %}">
+                <i class="bi bi-chat-left-text"></i> Adicionar observação do dia
+            </a>
+            <div class="collapse mt-2 {% if closing.notes %}show{% endif %}"
+                 id="observacao-collapse">
+                <div class="mx-auto" style="max-width:600px">
+                    <textarea name="notes"
+                              class="form-control"
+                              rows="2"
+                              placeholder="Ex: Chuva forte, promoção especial, jogo do Brasil...">{{ closing.notes }}</textarea>
+                </div>
+            </div>
+        </div>
+
+    </form>
+</div>
+
+<!-- Template de linha de despesa — clonado pelo JS ao adicionar nova despesa -->
+<template id="despesa-row-template">
+    <tr data-expense-row="1">
+        <input type="hidden" name="expense_id[]" value="">
+        <td class="ps-3">
+            <select name="expense_category[]" class="form-select form-select-sm">
+                <option value="">Selecionar...</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <input type="text"
+                   name="expense_description[]"
+                   class="form-control form-control-sm"
+                   placeholder="Descrição (opcional)"
+                   maxlength="200">
+        </td>
+        <td class="pe-2">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text">R$</span>
+                <input type="number"
+                       name="expense_amount[]"
+                       class="form-control text-end expense-amount-input"
+                       step="0.01"
+                       min="0.01"
+                       placeholder="0,00">
+            </div>
+        </td>
+        <td class="text-center pe-2">
+            <button type="button"
+                    class="btn btn-outline-danger btn-sm btn-remover-despesa"
+                    style="width:34px;height:34px;padding:0"
+                    title="Remover despesa">
+                &times;
+            </button>
+        </td>
+    </tr>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/daily_closing.js' %}"></script>
+<script>
+(function () {
+    'use strict';
+    var navDate = document.getElementById('nav-date');
+    if (!navDate) return;
+
+    navDate.addEventListener('change', function () {
+        var date = this.value;
+        if (!date) return;
+        var url = this.dataset.urlTemplate.replace('PLACEHOLDER', date);
+        window.location.href = url;
+    });
+}());
+</script>
+{% endblock %}

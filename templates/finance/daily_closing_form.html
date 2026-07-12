@@ -6,7 +6,7 @@
 <div class="container">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{{ NAV_INICIO }}</a></li>
             <li class="breadcrumb-item"><a href="{% url 'closing-list' %}">Fechamentos</a></li>
             <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
         </ol>
@@ -136,13 +136,6 @@
                 </div>
             </div>
 
-            <!-- Dica -->
-            <div class="alert alert-success mt-3">
-                <small>
-                    <i class="bi bi-lightbulb"></i>
-                    <strong>Meta:</strong> Registre o fechamento do dia em menos de 20 segundos!
-                </small>
-            </div>
         </div>
     </div>
 </div>

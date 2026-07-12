@@ -6,8 +6,8 @@
 <div class="container">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'expense-list' %}">Despesas</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{{ NAV_INICIO }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'daily-closing' object.date|date:'Y-m-d' %}">{{ NAV_FECHAMENTO }}</a></li>
             <li class="breadcrumb-item active" aria-current="page">Confirmar Exclusão</li>
         </ol>
     </nav>
@@ -53,8 +53,8 @@
                             <button type="submit" class="btn btn-danger btn-lg">
                                 <i class="bi bi-trash"></i> Sim, Excluir Despesa
                             </button>
-                            <a href="{% url 'expense-list' %}" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-circle"></i> Não, Voltar para Lista
+                            <a href="{% url 'daily-closing' object.date|date:'Y-m-d' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancelar
                             </a>
                         </div>
                     </form>

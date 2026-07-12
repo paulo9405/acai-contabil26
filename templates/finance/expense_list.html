@@ -14,8 +14,8 @@
     <!-- Ação Rápida -->
     <div class="row mb-4">
         <div class="col">
-            <a href="{% url 'expense-create' %}" class="btn btn-success btn-lg w-100">
-                <i class="bi bi-plus-circle"></i> Nova Despesa
+            <a href="{% url 'daily-closing-today' %}" class="btn btn-success btn-lg w-100">
+                <i class="bi bi-calendar-check"></i> Fechamento do Dia
             </a>
         </div>
     </div>
@@ -88,8 +88,8 @@
                     <p class="card-text mb-2">{{ expense.description|truncatewords:15 }}</p>
                     {% endif %}
                     <div class="d-grid gap-2">
-                        <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i> Editar
+                        <a href="{% url 'daily-closing' expense.date|date:'Y-m-d' %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-calendar-check"></i> Ver Fechamento
                         </a>
                         {% if user.is_superuser %}
                         <a href="{% url 'expense-delete' expense.pk %}" class="btn btn-sm btn-outline-danger">
@@ -123,11 +123,15 @@
                             <td>R$ {{ expense.amount }}</td>
                             <td>{{ expense.description|truncatewords:10|default:"-" }}</td>
                             <td class="text-end">
-                                <a href="{% url 'expense-edit' expense.pk %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
+                                <a href="{% url 'daily-closing' expense.date|date:'Y-m-d' %}"
+                                   class="btn btn-sm btn-outline-primary"
+                                   aria-label="Abrir fechamento de {{ expense.date|date:'d/m/Y' }}">
+                                    <i class="bi bi-calendar-check"></i>
                                 </a>
                                 {% if user.is_superuser %}
-                                <a href="{% url 'expense-delete' expense.pk %}" class="btn btn-sm btn-outline-danger">
+                                <a href="{% url 'expense-delete' expense.pk %}"
+                                   class="btn btn-sm btn-outline-danger"
+                                   aria-label="Excluir despesa de {{ expense.date|date:'d/m/Y' }}">
                                     <i class="bi bi-trash"></i>
                                 </a>
                                 {% endif %}
@@ -196,8 +200,8 @@
                     {% endif %}
                 </p>
                 <div class="d-flex gap-2 justify-content-center flex-wrap">
-                    <a href="{% url 'expense-create' %}" class="btn btn-success btn-lg">
-                        <i class="bi bi-plus-circle"></i> Registrar Despesa
+                    <a href="{% url 'daily-closing-today' %}" class="btn btn-success btn-lg">
+                        <i class="bi bi-calendar-check"></i> Ir para Fechamento do Dia
                     </a>
                     {% if request.GET.date_from or request.GET.date_to or request.GET.category %}
                     <a href="{% url 'expense-list' %}" class="btn btn-outline-secondary btn-lg">

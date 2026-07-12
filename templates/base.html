@@ -318,26 +318,32 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
+                        {% with url_name=request.resolver_match.url_name|default:'' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'dashboard' %}">
-                                <i class="bi bi-speedometer2"></i> Dashboard
+                            <a class="nav-link {% if url_name == 'dashboard' %}active{% endif %}"
+                               href="{% url 'dashboard' %}">
+                                <i class="bi bi-house"></i> {{ NAV_INICIO }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'reports' %}">
-                                <i class="bi bi-file-earmark-bar-graph"></i> Relatórios
+                            <a class="nav-link {% if url_name == 'daily-closing' or url_name == 'daily-closing-today' %}active{% endif %}"
+                               href="{% url 'daily-closing-today' %}">
+                                <i class="bi bi-calendar-check"></i> {{ NAV_FECHAMENTO }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'closing-list' %}">
-                                <i class="bi bi-calendar-check"></i> Fechamentos
+                            <a class="nav-link {% if url_name == 'closing-list' or url_name == 'closing-edit' or url_name == 'closing-delete' %}active{% endif %}"
+                               href="{% url 'closing-list' %}">
+                                <i class="bi bi-clock-history"></i> {{ NAV_HISTORICO }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'expense-list' %}">
-                                <i class="bi bi-receipt"></i> Despesas
+                            <a class="nav-link {% if url_name == 'reports' %}active{% endif %}"
+                               href="{% url 'reports' %}">
+                                <i class="bi bi-file-earmark-bar-graph"></i> {{ NAV_RELATORIOS }}
                             </a>
                         </li>
+                        {% endwith %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle"></i> {{ user.username }}
@@ -440,17 +446,6 @@
                             submitBtn.classList.remove('btn-loading');
                             submitBtn.disabled = false;
                         }, 5000);
-                    }
-                });
-            });
-
-            // Confirmação para links de exclusão
-            const deleteLinks = document.querySelectorAll('a[href*="delete"]');
-            deleteLinks.forEach(function(link) {
-                link.addEventListener('click', function(e) {
-                    if (!confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.')) {
-                        e.preventDefault();
-                        return false;
                     }
                 });
             });
