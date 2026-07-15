@@ -176,6 +176,7 @@ Campos:
 
 * Data
 * Quantidade de pedidos
+
 * Venda dinheiro
 * Venda pix
 * Venda cartão
