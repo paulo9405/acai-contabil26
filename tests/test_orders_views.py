@@ -1,5 +1,5 @@
 """
-Testes para as views do app orders — Fase 4 (Interface Operacional).
+Testes para as views do app orders — Fases 4 e 5.
 """
 
 import pytest
@@ -9,6 +9,7 @@ from datetime import date
 from django.contrib.auth.models import Group
 from django.urls import reverse
 
+from finance.models import DailyClosing
 from orders.models import Order
 from tests.conftest import (
     UserFactory,
@@ -17,6 +18,9 @@ from tests.conftest import (
     ProductFactory,
     ProductVariantFactory,
     AddonFactory,
+    OrderFactory,
+    OrderItemFactory,
+    DailyClosingFactory,
 )
 
 
@@ -37,6 +41,14 @@ def _operacao_client(db):
     client = Client()
     client.force_login(user)
     return client, user
+
+
+def _superuser_client(db):
+    from django.test import Client
+    user = UserFactory(is_superuser=True, is_staff=True)
+    client = Client()
+    client.force_login(user)
+    return client
 
 
 def _build_your_own_variant(db):
@@ -187,9 +199,10 @@ class TestOrderCreateViewSuccess:
         })
 
         assert response.status_code == 302
-        assert response['Location'] == reverse('order-create')
-
         order = Order.objects.get(comanda_number='10')
+        assert response['Location'] == reverse('order-detail', kwargs={'pk': order.pk})
+
+
         assert order.status == Order.Status.ACTIVE
         assert order.total == Decimal('24.00')
         assert order.created_by == user
@@ -315,3 +328,302 @@ class TestOrderCreateViewSuccess:
         client.post(reverse('order-create'), data)
 
         assert Order.objects.filter(comanda_number='1').count() == 2
+
+
+# ============================================================================
+# ORDER LIST VIEW — Fase 5
+# ============================================================================
+
+@pytest.mark.django_db
+class TestOrderListView:
+
+    def test_forbidden_for_regular_user(self, authenticated_client):
+        response = authenticated_client.get(reverse('order-list'))
+        assert response.status_code == 403
+
+    def test_allowed_for_operacao_user(self, db):
+        client, _ = _operacao_client(db)
+        response = client.get(reverse('order-list'))
+        assert response.status_code == 200
+
+    def test_defaults_to_today(self, db):
+        client, user = _operacao_client(db)
+        response = client.get(reverse('order-list'))
+        assert response.status_code == 200
+        assert response.context['order_date'] == date.today()
+
+    def test_shows_orders_for_date(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today)
+        response = client.get(reverse('order-list'))
+        assert order in list(response.context['orders'])
+
+    def test_date_navigation_via_url(self, db):
+        client, _ = _operacao_client(db)
+        response = client.get(reverse('order-list-date', kwargs={'order_date': '2026-07-01'}))
+        assert response.status_code == 200
+        from datetime import date as d
+        assert response.context['order_date'] == d(2026, 7, 1)
+
+    def test_invalid_date_falls_back_to_today(self, db):
+        client, _ = _operacao_client(db)
+        response = client.get(reverse('order-list-date', kwargs={'order_date': 'naoadata'}))
+        assert response.status_code == 200
+        assert response.context['order_date'] == date.today()
+
+    def test_cancelled_orders_shown_with_badge(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today, status=Order.Status.CANCELLED)
+        response = client.get(reverse('order-list'))
+        orders = list(response.context['orders'])
+        assert order in orders
+
+    def test_edit_button_hidden_when_day_closed_for_operacao(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        DailyClosingFactory(date=today)
+        response = client.get(reverse('order-list'))
+        assert response.context['can_edit'] is False
+
+    def test_edit_button_visible_for_superuser_even_after_close(self, db):
+        client = _superuser_client(db)
+        today = date.today()
+        DailyClosingFactory(date=today)
+        response = client.get(reverse('order-list'))
+        assert response.context['can_edit'] is True
+
+    def test_cancel_button_only_for_superuser(self, db):
+        client_op, _ = _operacao_client(db)
+        client_su = _superuser_client(db)
+        response_op = client_op.get(reverse('order-list'))
+        response_su = client_su.get(reverse('order-list'))
+        assert response_op.context['can_cancel'] is False
+        assert response_su.context['can_cancel'] is True
+
+    def test_same_comanda_number_two_orders_both_listed(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        OrderFactory(created_by=user, order_date=today, comanda_number='1')
+        OrderFactory(created_by=user, order_date=today, comanda_number='1')
+        response = client.get(reverse('order-list'))
+        comanda_1_orders = [o for o in response.context['orders'] if o.comanda_number == '1']
+        assert len(comanda_1_orders) == 2
+
+
+# ============================================================================
+# ORDER DETAIL VIEW — Fase 5
+# ============================================================================
+
+@pytest.mark.django_db
+class TestOrderDetailView:
+
+    def test_forbidden_for_regular_user(self, db, authenticated_client):
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = authenticated_client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_allowed_for_operacao_user(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.status_code == 200
+
+    def test_404_for_nonexistent_order(self, db):
+        client, _ = _operacao_client(db)
+        response = client.get(reverse('order-detail', kwargs={'pk': 99999}))
+        assert response.status_code == 404
+
+    def test_can_edit_true_when_day_open(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.context['can_edit'] is True
+
+    def test_can_edit_false_when_day_closed_for_operacao(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today)
+        DailyClosingFactory(date=today)
+        response = client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.context['can_edit'] is False
+
+    def test_can_cancel_false_for_operacao(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.context['can_cancel'] is False
+
+    def test_can_cancel_true_for_superuser(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-detail', kwargs={'pk': order.pk}))
+        assert response.context['can_cancel'] is True
+
+
+# ============================================================================
+# ORDER UPDATE VIEW — Fase 5
+# ============================================================================
+
+@pytest.mark.django_db
+class TestOrderUpdateView:
+
+    def test_forbidden_for_regular_user(self, db, authenticated_client):
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = authenticated_client.get(reverse('order-update', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_allowed_for_operacao_when_day_open(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-update', kwargs={'pk': order.pk}))
+        assert response.status_code == 200
+
+    def test_forbidden_for_operacao_when_day_closed(self, db):
+        client, user = _operacao_client(db)
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today)
+        DailyClosingFactory(date=today)
+        response = client.get(reverse('order-update', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_allowed_for_superuser_even_when_day_closed(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today)
+        DailyClosingFactory(date=today)
+        response = client.get(reverse('order-update', kwargs={'pk': order.pk}))
+        assert response.status_code == 200
+
+    def test_forbidden_for_cancelled_order(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user, status=Order.Status.CANCELLED)
+        response = client.get(reverse('order-update', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_post_updates_header_fields(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user, comanda_number='5', payment_method='PIX')
+        response = client.post(reverse('order-update', kwargs={'pk': order.pk}), {
+            'comanda_number': '10',
+            'order_time': '18:00',
+            'payment_method': 'CASH',
+            'notes': 'Sem granola',
+        })
+        assert response.status_code == 302
+        order.refresh_from_db()
+        assert order.comanda_number == '10'
+        assert order.payment_method == 'CASH'
+        assert order.notes == 'Sem granola'
+
+    def test_post_missing_comanda_shows_error(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.post(reverse('order-update', kwargs={'pk': order.pk}), {
+            'comanda_number': '',
+            'order_time': '18:00',
+            'payment_method': 'PIX',
+        })
+        assert response.status_code == 200
+
+    def test_post_clears_informed_total_when_empty(self, db):
+        client, user = _operacao_client(db)
+        from decimal import Decimal
+        order = OrderFactory(created_by=user, informed_total=Decimal('30.00'))
+        client.post(reverse('order-update', kwargs={'pk': order.pk}), {
+            'comanda_number': order.comanda_number,
+            'order_time': '14:00',
+            'payment_method': order.payment_method,
+            'informed_total': '',
+        })
+        order.refresh_from_db()
+        assert order.informed_total is None
+
+    def test_redirects_to_detail_on_success(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.post(reverse('order-update', kwargs={'pk': order.pk}), {
+            'comanda_number': order.comanda_number,
+            'order_time': '15:00',
+            'payment_method': order.payment_method,
+        })
+        assert response.status_code == 302
+        assert response['Location'] == reverse('order-detail', kwargs={'pk': order.pk})
+
+
+# ============================================================================
+# ORDER CANCEL VIEW — Fase 5
+# ============================================================================
+
+@pytest.mark.django_db
+class TestOrderCancelView:
+
+    def test_forbidden_for_operacao_user(self, db):
+        client, user = _operacao_client(db)
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-cancel', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_forbidden_for_regular_user(self, db, authenticated_client):
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = authenticated_client.get(reverse('order-cancel', kwargs={'pk': order.pk}))
+        assert response.status_code == 403
+
+    def test_get_shows_confirmation_form_for_superuser(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = client.get(reverse('order-cancel', kwargs={'pk': order.pk}))
+        assert response.status_code == 200
+        assert 'orders/order_cancel_confirm.html' in [t.name for t in response.templates]
+
+    def test_already_cancelled_redirects(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        order = OrderFactory(created_by=user, status=Order.Status.CANCELLED)
+        response = client.get(reverse('order-cancel', kwargs={'pk': order.pk}))
+        assert response.status_code == 302
+
+    def test_post_without_reason_shows_error(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = client.post(reverse('order-cancel', kwargs={'pk': order.pk}), {
+            'cancel_reason': ''
+        })
+        assert response.status_code == 200
+        order.refresh_from_db()
+        assert order.status == Order.Status.ACTIVE
+
+    def test_post_with_reason_cancels_order(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        order = OrderFactory(created_by=user)
+        response = client.post(reverse('order-cancel', kwargs={'pk': order.pk}), {
+            'cancel_reason': 'Pedido duplicado'
+        })
+        assert response.status_code == 302
+        order.refresh_from_db()
+        assert order.status == Order.Status.CANCELLED
+        assert order.cancel_reason == 'Pedido duplicado'
+        assert order.cancelled_by is not None
+        assert order.cancelled_at is not None
+
+    def test_cancel_redirects_to_order_list(self, db):
+        client = _superuser_client(db)
+        user = UserFactory()
+        today = date.today()
+        order = OrderFactory(created_by=user, order_date=today)
+        response = client.post(reverse('order-cancel', kwargs={'pk': order.pk}), {
+            'cancel_reason': 'Erro no lançamento'
+        })
+        assert response.status_code == 302
+        assert response['Location'] == reverse(
+            'order-list-date', kwargs={'order_date': today.isoformat()}
+        )

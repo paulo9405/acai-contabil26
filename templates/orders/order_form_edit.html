@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}Editar Pedido #{{ order.pk }} — Gestão Financeira{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="container pt-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'order-list-date' order.order_date|date:'Y-m-d' %}">
+                Pedidos de {{ order.order_date|date:"d/m/Y" }}
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'order-detail' order.pk %}">Pedido #{{ order.pk }}</a>
+        </li>
+        <li class="breadcrumb-item active">Editar</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h1 class="h3 mb-0">Editar Pedido #{{ order.pk }}</h1>
+            <small class="text-muted">{{ order.order_date|date:"d/m/Y" }}</small>
+        </div>
+    </div>
+
+    <!-- ITENS (somente leitura) -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-semibold">Itens do Pedido</h5>
+            <small class="text-muted">Itens não podem ser alterados</small>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Produto</th>
+                        <th class="text-center" style="width:55px">Qtd</th>
+                        <th class="text-end pe-3" style="width:110px">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td class="ps-3">
+                            {{ item.product_name }}{% if item.size_name %} — {{ item.size_name }}{% endif %}
+                            {% if item.addons.all %}
+                            <br><small class="text-muted">
+                                {% for addon in item.addons.all %}
+                                    {% if not forloop.first %}, {% endif %}{{ addon.name }}{% if not addon.is_included %} (+R$ {{ addon.unit_price|floatformat:2 }}){% endif %}
+                                {% endfor %}
+                            </small>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ item.quantity }}</td>
+                        <td class="text-end pe-3 fw-medium">R$ {{ item.line_total|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-light fw-bold">
+                        <td class="ps-3" colspan="2">Total calculado</td>
+                        <td class="text-end pe-3 text-success">R$ {{ order.total|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="card-footer bg-white py-2">
+            <small class="text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                Para alterar os itens, cancele este pedido e crie um novo.
+            </small>
+        </div>
+    </div>
+
+    <!-- FORMULÁRIO DE EDIÇÃO -->
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-semibold">Dados da Comanda</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-medium" for="id_comanda_number">Nº Comanda</label>
+                        <input type="text"
+                               name="comanda_number"
+                               id="id_comanda_number"
+                               class="form-control form-control-lg text-center"
+                               value="{{ post_data.comanda_number|default:order.comanda_number }}"
+                               maxlength="20" autocomplete="off">
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-medium">Data</label>
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               value="{{ order.order_date|date:'d/m/Y' }}"
+                               readonly disabled>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-medium" for="id_order_time">Horário</label>
+                        <input type="time"
+                               name="order_time"
+                               id="id_order_time"
+                               class="form-control form-control-lg text-center"
+                               value="{{ post_data.order_time|default:order.order_time|time:'H:i' }}"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-medium" for="id_payment_method">Pagamento</label>
+                        <select name="payment_method"
+                                id="id_payment_method"
+                                class="form-select form-select-lg">
+                            {% for value, label in payment_choices %}
+                            <option value="{{ value }}"
+                                {% if post_data.payment_method == value %}
+                                    selected
+                                {% elif not post_data and order.payment_method == value %}
+                                    selected
+                                {% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-5">
+                        <label class="form-label fw-medium" for="id_informed_total">
+                            Valor na comanda
+                            <span class="text-muted small fw-normal">(opcional)</span>
+                        </label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text">R$</span>
+                            <input type="number"
+                                   name="informed_total"
+                                   id="id_informed_total"
+                                   class="form-control"
+                                   value="{{ post_data.informed_total|default:order.informed_total|default:''|unlocalize }}"
+                                   step="0.01" min="0" placeholder="0,00" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-7">
+                        <label class="form-label fw-medium" for="id_notes">
+                            Observações
+                            <span class="text-muted small fw-normal">(opcional)</span>
+                        </label>
+                        <textarea name="notes"
+                                  id="id_notes"
+                                  class="form-control"
+                                  rows="2">{{ post_data.notes|default:order.notes }}</textarea>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-3 mb-5">
+            <button type="submit" class="btn btn-primary btn-lg px-4 fw-semibold">
+                <i class="bi bi-check-circle"></i> Salvar alterações
+            </button>
+            <a href="{% url 'order-detail' order.pk %}" class="btn btn-outline-secondary btn-lg">
+                Cancelar
+            </a>
+        </div>
+
+    </form>
+</div>
+{% endblock %}

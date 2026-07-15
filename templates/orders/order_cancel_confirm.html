@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}Cancelar Pedido #{{ order.pk }} — Gestão Financeira{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="container pt-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'order-list-date' order.order_date|date:'Y-m-d' %}">
+                Pedidos de {{ order.order_date|date:"d/m/Y" }}
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'order-detail' order.pk %}">Pedido #{{ order.pk }}</a>
+        </li>
+        <li class="breadcrumb-item active">Cancelar</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="row mb-4">
+        <div class="col-12 col-md-8 col-lg-6 mx-auto">
+
+            <div class="alert alert-danger mb-4">
+                <h4 class="alert-heading">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Cancelar Pedido #{{ order.pk }}?
+                </h4>
+                <p class="mb-0">
+                    Esta ação <strong>não pode ser desfeita</strong>. O pedido ficará com status
+                    <span class="badge bg-danger">Cancelado</span> e não será contabilizado no fechamento.
+                </p>
+            </div>
+
+            <!-- Resumo do pedido -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="mb-0 fw-semibold">Resumo do Pedido</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Comanda</small>
+                            <strong>{{ order.comanda_number }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Horário</small>
+                            <strong>{{ order.order_time|time:"H:i" }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Pagamento</small>
+                            <strong>{{ order.get_payment_method_display }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Total</small>
+                            <strong class="text-success">R$ {{ order.total|floatformat:2 }}</strong>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-top">
+                        <small class="text-muted">Itens:</small>
+                        <ul class="mb-0 mt-1 ps-3">
+                            {% for item in order.items.all %}
+                            <li>
+                                {{ item.product_name }}{% if item.size_name %} — {{ item.size_name }}{% endif %}
+                                {% if item.quantity > 1 %}(×{{ item.quantity }}){% endif %}
+                                — R$ {{ item.line_total|floatformat:2 }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário de cancelamento -->
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="card mb-4 shadow-sm border-danger">
+                    <div class="card-body">
+                        <label class="form-label fw-semibold" for="id_cancel_reason">
+                            Motivo do cancelamento <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="cancel_reason"
+                                  id="id_cancel_reason"
+                                  class="form-control"
+                                  rows="3"
+                                  placeholder="Descreva o motivo do cancelamento..."
+                                  required>{{ post_data.cancel_reason|default:'' }}</textarea>
+                        <small class="text-muted">Obrigatório. Será registrado na auditoria.</small>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-danger btn-lg px-4 fw-semibold">
+                        <i class="bi bi-x-circle"></i> Confirmar Cancelamento
+                    </button>
+                    <a href="{% url 'order-detail' order.pk %}"
+                       class="btn btn-outline-secondary btn-lg">
+                        Voltar
+                    </a>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

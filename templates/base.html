@@ -344,8 +344,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if url_name == 'order-create' %}active{% endif %}"
-                               href="{% url 'order-create' %}">
+                            <a class="nav-link {% if url_name == 'order-list' or url_name == 'order-list-date' or url_name == 'order-create' or url_name == 'order-detail' or url_name == 'order-update' or url_name == 'order-cancel' %}active{% endif %}"
+                               href="{% url 'order-list' %}">
                                 <i class="bi bi-receipt"></i> {{ NAV_PEDIDOS }}
                             </a>
                         </li>

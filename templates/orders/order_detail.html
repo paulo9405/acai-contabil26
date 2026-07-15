@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}Pedido #{{ order.pk }} — Gestão Financeira{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="container pt-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'order-list-date' order.order_date|date:'Y-m-d' %}">
+                Pedidos de {{ order.order_date|date:"d/m/Y" }}
+            </a>
+        </li>
+        <li class="breadcrumb-item active">Pedido #{{ order.pk }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- CABEÇALHO -->
+    <div class="row mb-4 align-items-start">
+        <div class="col">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="h3 mb-0">Pedido #{{ order.pk }}</h1>
+                {% if order.status == 'CANCELLED' %}
+                <span class="badge bg-danger fs-6">Cancelado</span>
+                {% else %}
+                <span class="badge bg-success fs-6">Ativo</span>
+                {% endif %}
+            </div>
+            <small class="text-muted">
+                Comanda {{ order.comanda_number }} &middot;
+                {{ order.order_date|date:"d/m/Y" }} às {{ order.order_time|time:"H:i" }} &middot;
+                Lançado por {{ order.created_by.username }}
+            </small>
+        </div>
+        <div class="col-auto mt-2 mt-sm-0 d-flex gap-2 flex-wrap">
+            {% if can_edit %}
+            <a href="{% url 'order-update' order.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            {% endif %}
+            {% if can_cancel %}
+            <a href="{% url 'order-cancel' order.pk %}" class="btn btn-outline-danger">
+                <i class="bi bi-x-circle"></i> Cancelar
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if day_is_closed and not can_edit and order.status == 'ACTIVE' %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-lock-fill me-2"></i>
+        Dia fechado — edição permitida apenas para administradores.
+    </div>
+    {% endif %}
+
+    <!-- INFORMAÇÕES DO PEDIDO -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-semibold">Informações</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <small class="text-muted d-block">Comanda</small>
+                    <strong>{{ order.comanda_number }}</strong>
+                </div>
+                <div class="col-6 col-md-3">
+                    <small class="text-muted d-block">Data</small>
+                    <strong>{{ order.order_date|date:"d/m/Y" }}</strong>
+                </div>
+                <div class="col-6 col-md-3">
+                    <small class="text-muted d-block">Horário</small>
+                    <strong>{{ order.order_time|time:"H:i" }}</strong>
+                </div>
+                <div class="col-6 col-md-3">
+                    <small class="text-muted d-block">Pagamento</small>
+                    <strong>{{ order.get_payment_method_display }}</strong>
+                </div>
+            </div>
+
+            {% if order.notes %}
+            <div class="mt-3 pt-3 border-top">
+                <small class="text-muted d-block">Observações</small>
+                {{ order.notes }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ITENS -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-semibold">Itens</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Produto</th>
+                        <th class="text-center" style="width:55px">Qtd</th>
+                        <th class="text-end" style="width:100px">Unit.</th>
+                        <th class="text-end pe-3" style="width:110px">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td class="ps-3">
+                            <strong>{{ item.product_name }}</strong>
+                            {% if item.size_name %} — {{ item.size_name }}{% endif %}
+                            {% if item.addons.all %}
+                            <div class="mt-1">
+                                {% for addon in item.addons.all %}
+                                <span class="badge {% if addon.is_included %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% endif %} me-1 mb-1">
+                                    {{ addon.name }}{% if not addon.is_included %} +R$ {{ addon.unit_price|floatformat:2 }}{% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ item.quantity }}</td>
+                        <td class="text-end">R$ {{ item.unit_price|floatformat:2 }}</td>
+                        <td class="text-end pe-3 fw-medium">R$ {{ item.line_total|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-light fw-bold">
+                        <td class="ps-3" colspan="3">Total calculado</td>
+                        <td class="text-end pe-3 fs-5 text-success">R$ {{ order.total|floatformat:2 }}</td>
+                    </tr>
+                    {% if order.informed_total %}
+                    <tr>
+                        <td class="ps-3" colspan="3">
+                            <small class="text-muted">Valor informado na comanda</small>
+                        </td>
+                        <td class="text-end pe-3">
+                            <small>R$ {{ order.informed_total|floatformat:2 }}</small>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tfoot>
+            </table>
+        </div>
+
+        {% if order.has_total_divergence %}
+        <div class="card-footer bg-warning-subtle border-warning">
+            <small class="text-warning-emphasis">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                Divergência: total calculado (R$ {{ order.total|floatformat:2 }}) ≠ informado (R$ {{ order.informed_total|floatformat:2 }}).
+            </small>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- CANCELAMENTO (se aplicável) -->
+    {% if order.status == 'CANCELLED' %}
+    <div class="card mb-4 shadow-sm border-danger">
+        <div class="card-header bg-danger text-white py-3">
+            <h5 class="mb-0 fw-semibold"><i class="bi bi-x-circle me-2"></i>Cancelamento</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <small class="text-muted d-block">Cancelado por</small>
+                    <strong>{{ order.cancelled_by.username }}</strong>
+                </div>
+                <div class="col-12 col-md-4">
+                    <small class="text-muted d-block">Cancelado em</small>
+                    <strong>{{ order.cancelled_at|date:"d/m/Y" }} às {{ order.cancelled_at|time:"H:i" }}</strong>
+                </div>
+                <div class="col-12">
+                    <small class="text-muted d-block">Motivo</small>
+                    {{ order.cancel_reason }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mb-5">
+        <a href="{% url 'order-list-date' order.order_date|date:'Y-m-d' %}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar para lista
+        </a>
+    </div>
+
+</div>
+{% endblock %}

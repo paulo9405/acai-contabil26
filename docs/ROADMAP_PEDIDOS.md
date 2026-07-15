@@ -700,7 +700,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 5 — Listagem, Edição e Cancelamento
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Tela de conferência dos pedidos do dia; correção e cancelamento conforme permissão.
 
@@ -719,13 +719,13 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fase 4.
 
 **Checklist técnico:**
-- [ ] `OrderListView`: filtro por data (navegação por dia, padrão da tela de fechamento)
-- [ ] Exibir: número, horário, itens resumidos, pagamento, total, usuário, status
-- [ ] Botão "Ver" (todos); "Corrigir" (`Operacao` enquanto o dia não foi fechado, ou `is_superuser` sempre); "Cancelar" (apenas `is_superuser`)
-- [ ] `OrderUpdateView` com validação da janela de edição (existe `DailyClosing` do dia? → só `is_superuser` — DA-17)
-- [ ] `OrderCancelView` com confirmação, **motivo obrigatório**, auditoria (`cancel_reason`, `cancelled_by`, `cancelled_at`)
-- [ ] Pedidos cancelados exibidos com badge/estilo distinto
-- [ ] Sem delete físico de pedidos
+- [x] `OrderListView`: filtro por data (navegação por dia, padrão da tela de fechamento)
+- [x] Exibir: número, horário, itens resumidos, pagamento, total, usuário, status
+- [x] Botão "Ver" (todos); "Corrigir" (`Operacao` enquanto o dia não foi fechado, ou `is_superuser` sempre); "Cancelar" (apenas `is_superuser`)
+- [x] `OrderUpdateView` com validação da janela de edição (existe `DailyClosing` do dia? → só `is_superuser` — DA-17)
+- [x] `OrderCancelView` com confirmação, **motivo obrigatório**, auditoria (`cancel_reason`, `cancelled_by`, `cancelled_at`)
+- [x] Pedidos cancelados exibidos com badge/estilo distinto
+- [x] Sem delete físico de pedidos
 
 **Testes esperados:**
 - Listagem do dia mostra pedidos corretamente (inclui comandas com número repetido)
@@ -736,10 +736,10 @@ Order.total = sum(line_total de todos os OrderItems)
 - Dois pedidos com o mesmo `comanda_number` no mesmo dia coexistem normalmente
 
 **Critérios de aceite:**
-- [ ] Tela facilita conferência com comandas físicas
-- [ ] Cancelamento com auditoria visível
-- [ ] Permissões respeitadas
-- [ ] Cobertura ≥ 80%
+- [x] Tela facilita conferência com comandas físicas
+- [x] Cancelamento com auditoria visível
+- [x] Permissões respeitadas
+- [x] Cobertura ≥ 80%
 
 ---
 
@@ -1028,6 +1028,38 @@ Criação da tela de lançamento de pedidos: `OrderCreateView`, URLs, template m
 **Pendências encontradas:**
 - Validação visual em mobile 390px pendente (requer dispositivo real / navegador).
 - Após lançamento bem-sucedido, redireciona para o formulário limpo (Phase 5 adicionará link para lista do dia).
+
+---
+
+### Fase 5 — Listagem, Edição e Cancelamento
+**Data:** 2026-07-15
+**Fase:** 5 — Listagem, Edição e Cancelamento
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+`OrderListView` com navegação por data (padrão `DailyClosingUnifiedView`), `OrderDetailView` com itens e adicionais, `OrderUpdateView` respeitando janela de edição (DA-17), `OrderCancelView` exclusiva de superusuário com motivo obrigatório e auditoria completa. Menu "Pedidos" atualizado para apontar para a lista. `OrderCreateView` agora redireciona para o detalhe após criação.
+
+**Arquivos criados:**
+- `templates/orders/order_list.html`
+- `templates/orders/order_detail.html`
+- `templates/orders/order_form_edit.html`
+- `templates/orders/order_cancel_confirm.html`
+- 34 novos testes em `tests/test_orders_views.py`
+
+**Arquivos modificados:**
+- `orders/views.py` — `OrderListView`, `OrderDetailView`, `OrderUpdateView`, `OrderCancelView`; redirect do create atualizado
+- `orders/urls.py` — 5 novas rotas
+- `orders/selectors.py` — `get_orders_by_date_with_items()`
+- `templates/base.html` — nav "Pedidos" aponta para `order-list`
+- `tests/test_orders_views.py` — novos testes de Fase 5
+
+**Migrações criadas:** nenhuma.
+
+**Testes executados:** 231 passando, cobertura total 83.08%.
+
+**Decisões registradas:** nenhuma nova — todas cobertas por DA-01 a DA-19.
+
+**Pendências encontradas:** nenhuma. Fase 6 pode iniciar (integração com Fechamento Diário).
 
 ---
 

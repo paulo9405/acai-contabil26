@@ -31,6 +31,18 @@ def get_order_detail(*, order_id):
     )
 
 
+def get_orders_by_date_with_items(*, date):
+    """
+    Retorna pedidos de uma data com itens pré-carregados (para listagem).
+    """
+    return (
+        Order.objects.filter(order_date=date)
+        .select_related('created_by', 'cancelled_by')
+        .prefetch_related('items')
+        .order_by('order_time', 'comanda_number')
+    )
+
+
 def get_catalog_json():
     """
     Retorna o catálogo ativo como dict estruturado para embedding via json_script.

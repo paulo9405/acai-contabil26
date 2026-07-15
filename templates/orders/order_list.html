@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block title %}Pedidos — {{ order_date|date:"d/m/Y" }} — Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- CABEÇALHO -->
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h1 class="h3 mb-0">Pedidos do Dia</h1>
+
+            <!-- Navegação de data -->
+            <div class="d-flex align-items-center gap-1 mt-2 flex-wrap">
+                <a href="{% url 'order-list-date' prev_date_str %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   title="Dia anterior">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+
+                <input type="date"
+                       id="nav-date"
+                       value="{{ order_date|date:'Y-m-d' }}"
+                       max="{{ today|date:'Y-m-d' }}"
+                       data-url-template="{{ list_url_template }}"
+                       class="form-control form-control-sm"
+                       style="width:auto;min-width:145px"
+                       aria-label="Selecionar data">
+
+                {% if next_date_str %}
+                <a href="{% url 'order-list-date' next_date_str %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   title="Próximo dia">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+                {% else %}
+                <button class="btn btn-outline-secondary btn-sm" disabled title="Não é possível avançar além de hoje">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+                {% endif %}
+
+                {% if order_date != today %}
+                <a href="{% url 'order-list' %}" class="btn btn-outline-primary btn-sm ms-1">Hoje</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-auto mt-2 mt-sm-0">
+            <a href="{% url 'order-create' %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Novo Pedido
+            </a>
+        </div>
+    </div>
+
+    <!-- RESUMO DO DIA -->
+    {% if count_active > 0 %}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body py-3">
+            <div class="row text-center g-0">
+                <div class="col-6 border-end">
+                    <small class="text-muted d-block mb-1">Pedidos ativos</small>
+                    <strong class="fs-5">{{ count_active }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block mb-1">Total</small>
+                    <strong class="fs-5 text-success">R$ {{ total_active|floatformat:2 }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if day_is_closed %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-lock-fill me-2"></i>
+        Dia fechado. Funcionários não podem editar pedidos deste dia.
+        {% if user.is_superuser %}Você pode editar como administrador.{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- LISTA DE PEDIDOS -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-semibold">
+                {{ orders|length }} pedido{% if orders|length != 1 %}s{% endif %}
+            </h5>
+        </div>
+
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="min-width:70px">Comanda</th>
+                        <th style="min-width:65px">Horário</th>
+                        <th>Itens</th>
+                        <th style="min-width:75px">Pag.</th>
+                        <th class="text-end pe-2" style="min-width:90px">Total</th>
+                        <th style="min-width:80px">Status</th>
+                        <th style="min-width:100px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr class="{% if order.status == 'CANCELLED' %}text-muted{% endif %}">
+                        <td class="ps-3 fw-medium">
+                            {{ order.comanda_number }}
+                        </td>
+                        <td>{{ order.order_time|time:"H:i" }}</td>
+                        <td>
+                            <small {% if order.status == 'CANCELLED' %}class="text-decoration-line-through"{% endif %}>
+                                {% for item in order.items.all %}
+                                    {% if not forloop.first %}, {% endif %}
+                                    {{ item.product_name }}{% if item.size_name %} {{ item.size_name }}{% endif %}
+                                    {% if item.quantity > 1 %}(×{{ item.quantity }}){% endif %}
+                                {% endfor %}
+                            </small>
+                        </td>
+                        <td>
+                            {% if order.payment_method == 'PIX' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Pix</span>
+                            {% elif order.payment_method == 'CASH' %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Dinheiro</span>
+                            {% else %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Cartão</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-2 fw-medium">
+                            {% if order.status == 'CANCELLED' %}
+                            <span class="text-decoration-line-through">R$ {{ order.total|floatformat:2 }}</span>
+                            {% else %}
+                            R$ {{ order.total|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.status == 'CANCELLED' %}
+                            <span class="badge bg-danger">Cancelado</span>
+                            {% else %}
+                            <span class="badge bg-success">Ativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-2">
+                            <div class="d-flex gap-1 justify-content-end">
+                                <a href="{% url 'order-detail' order.pk %}"
+                                   class="btn btn-outline-secondary btn-sm"
+                                   title="Ver detalhe">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if can_edit and order.status == 'ACTIVE' %}
+                                <a href="{% url 'order-update' order.pk %}"
+                                   class="btn btn-outline-primary btn-sm"
+                                   title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% endif %}
+                                {% if can_cancel and order.status == 'ACTIVE' %}
+                                <a href="{% url 'order-cancel' order.pk %}"
+                                   class="btn btn-outline-danger btn-sm"
+                                   title="Cancelar">
+                                    <i class="bi bi-x-circle"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-receipt d-block mb-2" style="font-size:2.5rem;opacity:.25"></i>
+            <p class="mb-3">Nenhum pedido lançado para este dia.</p>
+            <a href="{% url 'order-create' %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Lançar primeiro pedido
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+    var navDate = document.getElementById('nav-date');
+    if (!navDate) return;
+    navDate.addEventListener('change', function () {
+        var d = this.value;
+        if (!d) return;
+        window.location.href = this.dataset.urlTemplate.replace('PLACEHOLDER', d);
+    });
+}());
+</script>
+{% endblock %}
