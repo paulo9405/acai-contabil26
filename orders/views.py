@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from finance.forms import ReportFilterForm
 from finance.models import DailyClosing
-from orders.models import Order, ProductVariant, Addon
+from orders.models import Order, OrderItem, ProductVariant, Addon
 from orders.selectors import (
     get_catalog_json,
     get_daily_order_totals,
@@ -58,12 +58,13 @@ def _calculate_period_dates(period, custom_start, custom_end):
 class OrderCreateView(LoginRequiredMixin, View):
     template_name = 'orders/order_form.html'
 
-    def _context(self, post_data=None):
+    def _context(self, post_data=None, form_errors=None):
         return {
             'catalog_json': get_catalog_json(),
             'today': date.today().isoformat(),
             'payment_choices': Order.PaymentMethod.choices,
             'post_data': post_data or {},
+            'form_errors': form_errors or [],
         }
 
     def get(self, request):
@@ -89,9 +90,15 @@ class OrderCreateView(LoginRequiredMixin, View):
         informed_total_str = request.POST.get('informed_total', '').strip()
         notes = request.POST.get('notes', '').strip()
 
+        item_types = request.POST.getlist('item_type[]')
         variant_ids = request.POST.getlist('item_variant_id[]')
         quantities = request.POST.getlist('item_quantity[]')
         addon_id_lists = request.POST.getlist('item_addon_ids[]')
+        manual_descriptions = request.POST.getlist('item_manual_description[]')
+        manual_unit_prices = request.POST.getlist('item_manual_unit_price[]')
+
+        # Compat: se item_type[] não vier (testes antigos), usa variant_ids como driver
+        n_items = len(item_types) if item_types else len(variant_ids)
 
         errors = []
 
@@ -103,7 +110,7 @@ class OrderCreateView(LoginRequiredMixin, View):
             errors.append('Horário é obrigatório.')
         if not payment_method:
             errors.append('Forma de pagamento é obrigatória.')
-        if not variant_ids:
+        if n_items == 0:
             errors.append('Adicione pelo menos um item ao pedido.')
 
         order_date = None
@@ -127,40 +134,58 @@ class OrderCreateView(LoginRequiredMixin, View):
                 errors.append('Valor informado na comanda inválido.')
 
         if errors:
-            for msg in errors:
-                messages.error(request, msg)
-            return render(request, self.template_name, self._context(post_data=request.POST))
+            return render(request, self.template_name, self._context(
+                post_data=request.POST, form_errors=errors,
+            ))
 
         items = []
-        for i, vid in enumerate(variant_ids):
-            try:
-                variant = ProductVariant.objects.select_related('product', 'size').get(pk=vid, active=True)
-            except (ProductVariant.DoesNotExist, ValueError):
-                errors.append(f'Produto inválido no item {i + 1}.')
-                continue
+        for i in range(n_items):
+            itype = item_types[i] if i < len(item_types) else OrderItem.ItemType.CATALOG
 
             try:
                 qty = max(1, int(quantities[i]) if i < len(quantities) else 1)
             except (ValueError, TypeError):
                 qty = 1
 
-            addon_ids_str = addon_id_lists[i] if i < len(addon_id_lists) else ''
-            addons = []
-            if addon_ids_str:
-                for aid in addon_ids_str.split(','):
-                    aid = aid.strip()
-                    if aid:
-                        try:
-                            addons.append(Addon.objects.get(pk=int(aid), active=True))
-                        except (Addon.DoesNotExist, ValueError):
-                            pass
-
-            items.append({'variant': variant, 'quantity': qty, 'addons': addons})
+            if itype == OrderItem.ItemType.MANUAL:
+                desc = (manual_descriptions[i] if i < len(manual_descriptions) else '').strip()
+                price_str = manual_unit_prices[i] if i < len(manual_unit_prices) else ''
+                price = safe_decimal(price_str)
+                if not desc:
+                    errors.append(f'Descrição obrigatória no item avulso {i + 1}.')
+                    continue
+                if price is None or price <= Decimal('0'):
+                    errors.append(f'Valor inválido no item avulso {i + 1}.')
+                    continue
+                items.append({
+                    'item_type': OrderItem.ItemType.MANUAL,
+                    'description': desc,
+                    'unit_price': price,
+                    'quantity': qty,
+                })
+            else:
+                vid = variant_ids[i] if i < len(variant_ids) else ''
+                try:
+                    variant = ProductVariant.objects.select_related('product', 'size').get(pk=vid, active=True)
+                except (ProductVariant.DoesNotExist, ValueError):
+                    errors.append(f'Produto inválido no item {i + 1}.')
+                    continue
+                addon_ids_str = addon_id_lists[i] if i < len(addon_id_lists) else ''
+                addons = []
+                if addon_ids_str:
+                    for aid in addon_ids_str.split(','):
+                        aid = aid.strip()
+                        if aid:
+                            try:
+                                addons.append(Addon.objects.get(pk=int(aid), active=True))
+                            except (Addon.DoesNotExist, ValueError):
+                                pass
+                items.append({'variant': variant, 'quantity': qty, 'addons': addons})
 
         if errors:
-            for msg in errors:
-                messages.error(request, msg)
-            return render(request, self.template_name, self._context(post_data=request.POST))
+            return render(request, self.template_name, self._context(
+                post_data=request.POST, form_errors=errors,
+            ))
 
         try:
             order = create_order(

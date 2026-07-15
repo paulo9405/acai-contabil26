@@ -1,7 +1,8 @@
 /**
- * Lançamento de Pedido — seleção de catálogo, carrinho e envio.
+ * Lançamento de Pedido — fluxo por etapas progressivas.
  *
- * Fluxo: Categoria → Produto → Tamanho → (Adicionais) → Qtd → Adicionar → Lançar
+ * Catálogo: Categoria → Produto → Tamanho → (Adicionais) → Qtd → Adicionar → Lançar
+ * Avulso:   "Item avulso" → Descrição + Valor + Qtd → Adicionar → Lançar
  */
 (function () {
     'use strict';
@@ -9,15 +10,15 @@
     // =========================================================================
     // Catálogo e mapas de busca rápida
     // =========================================================================
-    const catalogEl = document.getElementById('catalog-data');
+    var catalogEl = document.getElementById('catalog-data');
     if (!catalogEl) return;
 
-    const catalog = JSON.parse(catalogEl.textContent);
+    var catalog = JSON.parse(catalogEl.textContent);
 
-    const categoryMap = {};
-    const productMap  = {};
-    const variantMap  = {};
-    const addonMap    = {};
+    var categoryMap = {};
+    var productMap  = {};
+    var variantMap  = {};
+    var addonMap    = {};
 
     catalog.categories.forEach(function (cat) {
         categoryMap[cat.id] = cat;
@@ -25,13 +26,13 @@
             productMap[prod.id] = prod;
             prod.variants.forEach(function (v) {
                 variantMap[v.id] = {
-                    id:                   v.id,
-                    display:              v.display,
-                    price:                v.price,
+                    id:                    v.id,
+                    display:               v.display,
+                    price:                 v.price,
                     included_addons_limit: v.included_addons_limit,
-                    productId:            prod.id,
-                    productName:          prod.name,
-                    productType:          prod.product_type,
+                    productId:             prod.id,
+                    productName:           prod.name,
+                    productType:           prod.product_type,
                 };
             });
         });
@@ -42,37 +43,69 @@
     });
 
     // =========================================================================
+    // Ordem fixa das categorias exibidas (conforme cardápio)
+    // =========================================================================
+    var CATEGORY_ORDER = ['Açaís Prontos', 'Monte seu Açaí', 'Sorvetes', 'Vitaminas'];
+
+    function getSortedCategories() {
+        return CATEGORY_ORDER
+            .map(function (name) {
+                return catalog.categories.find(function (c) { return c.name === name; });
+            })
+            .filter(Boolean);
+    }
+
+    // =========================================================================
     // Estado do carrinho e seleção atual
     // =========================================================================
-    var cart = [];  // [{variantId, productName, variantDisplay, quantity, unitPrice, addons, lineTotal}]
+    var cart = [];
 
     var selectedCatId     = null;
     var selectedProdId    = null;
     var selectedVariantId = null;
+    var currentMode       = null; // null = catálogo | 'MANUAL' = item avulso
 
     // =========================================================================
     // Referências ao DOM
     // =========================================================================
-    var catButtons      = document.getElementById('cat-buttons');
-    var prodSection     = document.getElementById('prod-section');
-    var prodButtons     = document.getElementById('prod-buttons');
-    var variantSection  = document.getElementById('variant-section');
-    var variantButtons  = document.getElementById('variant-buttons');
-    var addonSection    = document.getElementById('addon-section');
-    var addonLimitInfo  = document.getElementById('addon-limit-info');
-    var addonCheckboxes = document.getElementById('addon-checkboxes');
-    var itemQtyInput    = document.getElementById('item-quantity');
-    var btnAddItem      = document.getElementById('btn-add-item');
-    var cartTbody       = document.getElementById('cart-tbody');
-    var cartEmptyRow    = document.getElementById('cart-empty');
-    var cartCount       = document.getElementById('cart-count');
-    var orderTotal      = document.getElementById('order-total');
-    var informedInput   = document.getElementById('id_informed_total');
-    var divergenceAlert = document.getElementById('divergence-alert');
-    var divergenceMsg   = document.getElementById('divergence-msg');
-    var formItems       = document.getElementById('form-items');
-    var orderForm       = document.getElementById('order-form');
-    var btnSubmit       = document.getElementById('btn-submit');
+    var catStep          = document.getElementById('cat-step');
+    var catButtons       = document.getElementById('cat-buttons');
+    var prodSection      = document.getElementById('prod-section');
+    var prodButtons      = document.getElementById('prod-buttons');
+    var variantSection   = document.getElementById('variant-section');
+    var variantButtons   = document.getElementById('variant-buttons');
+    var addonSection     = document.getElementById('addon-section');
+    var addonLimitInfo   = document.getElementById('addon-limit-info');
+    var addonCheckboxes  = document.getElementById('addon-checkboxes');
+    var confirmSection   = document.getElementById('confirm-section');
+    var itemQtyInput     = document.getElementById('item-quantity');
+    var btnQtyDec        = document.getElementById('btn-qty-dec');
+    var btnQtyInc        = document.getElementById('btn-qty-inc');
+    var btnAddItem       = document.getElementById('btn-add-item');
+    var cartTbody        = document.getElementById('cart-tbody');
+    var cartEmptyRow     = document.getElementById('cart-empty');
+    var cartCount        = document.getElementById('cart-count');
+    var orderTotal       = document.getElementById('order-total');
+    var informedInput    = document.getElementById('id_informed_total');
+    var divergenceAlert  = document.getElementById('divergence-alert');
+    var divergenceMsg    = document.getElementById('divergence-msg');
+    var formItems        = document.getElementById('form-items');
+    var orderForm        = document.getElementById('order-form');
+    var btnSubmit        = document.getElementById('btn-submit');
+    var btnBackStep      = document.getElementById('btn-back-step');
+    var stepTitle        = document.getElementById('step-title');
+
+    var cartStateInput   = document.getElementById('cart-state');
+
+    // Elementos do fluxo avulso
+    var manualSection    = document.getElementById('manual-section');
+    var manualDescInput  = document.getElementById('manual-desc');
+    var manualPriceInput = document.getElementById('manual-price');
+    var manualQtyInput   = document.getElementById('manual-quantity');
+    var btnManualQtyDec  = document.getElementById('btn-manual-qty-dec');
+    var btnManualQtyInc  = document.getElementById('btn-manual-qty-inc');
+    var btnAddManual     = document.getElementById('btn-add-manual');
+    var btnManualItem    = document.getElementById('btn-manual-item');
 
     // =========================================================================
     // Utilitários
@@ -90,18 +123,45 @@
     }
 
     // =========================================================================
-    // Renderização de categorias
+    // Gestão de etapas
+    // =========================================================================
+    var stepHistory = [];
+
+    function showOnlyStep(visibleEl) {
+        [catStep, prodSection, variantSection, manualSection].forEach(function (el) {
+            toggleSection(el, el === visibleEl);
+        });
+    }
+
+    function goBack() {
+        if (stepHistory.length === 0) return;
+        var entry = stepHistory.pop();
+        entry.fn();
+    }
+
+    function setStepTitle(title, showBack) {
+        if (stepTitle) stepTitle.textContent = title;
+        toggleSection(btnBackStep, showBack);
+    }
+
+    // =========================================================================
+    // ETAPA 1: Renderização de categorias
     // =========================================================================
     function renderCategories() {
         catButtons.innerHTML = '';
-        catalog.categories.forEach(function (cat) {
+        getSortedCategories().forEach(function (cat) {
+            var col = document.createElement('div');
+            col.className = 'col';
+
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-outline-secondary';
+            btn.className = 'btn btn-outline-primary w-100 fw-medium';
             btn.dataset.catId = cat.id;
             btn.textContent = cat.name;
             btn.addEventListener('click', function () { selectCategory(cat.id); });
-            catButtons.appendChild(btn);
+
+            col.appendChild(btn);
+            catButtons.appendChild(col);
         });
     }
 
@@ -110,32 +170,50 @@
         selectedProdId    = null;
         selectedVariantId = null;
 
-        catButtons.querySelectorAll('button').forEach(function (b) {
-            var active = String(b.dataset.catId) === String(catId);
-            b.className = 'btn ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+        var cat = categoryMap[catId];
+
+        stepHistory.push({
+            fn: function () {
+                selectedCatId     = null;
+                selectedProdId    = null;
+                selectedVariantId = null;
+                showOnlyStep(catStep);
+                variantButtons.innerHTML = '';
+                clearAddons();
+                toggleSection(confirmSection, false);
+                setStepTitle('Adicionar Item', false);
+                updateAddButton();
+            }
         });
 
-        renderProducts(categoryMap[catId].products);
-        clearVariants();
+        showOnlyStep(prodSection);
         clearAddons();
+        toggleSection(confirmSection, false);
+        setStepTitle(cat.name, true);
         updateAddButton();
+
+        renderProducts(cat.products); // pode auto-avançar para variantes se houver 1 produto
     }
 
     // =========================================================================
-    // Renderização de produtos
+    // ETAPA 2: Renderização de produtos
     // =========================================================================
     function renderProducts(products) {
         prodButtons.innerHTML = '';
-        toggleSection(prodSection, true);
 
         products.forEach(function (prod) {
+            var col = document.createElement('div');
+            col.className = 'col';
+
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-outline-secondary';
+            btn.className = 'btn btn-outline-secondary w-100';
             btn.dataset.prodId = prod.id;
             btn.textContent = prod.name;
             btn.addEventListener('click', function () { selectProduct(prod.id); });
-            prodButtons.appendChild(btn);
+
+            col.appendChild(btn);
+            prodButtons.appendChild(col);
         });
 
         if (products.length === 1) selectProduct(products[0].id);
@@ -145,32 +223,52 @@
         selectedProdId    = prodId;
         selectedVariantId = null;
 
-        prodButtons.querySelectorAll('button').forEach(function (b) {
-            var active = String(b.dataset.prodId) === String(prodId);
-            b.className = 'btn ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+        var prod = productMap[prodId];
+        var cat  = categoryMap[selectedCatId];
+
+        stepHistory.push({
+            fn: function () {
+                selectedProdId    = null;
+                selectedVariantId = null;
+                showOnlyStep(prodSection);
+                variantButtons.innerHTML = '';
+                clearAddons();
+                toggleSection(confirmSection, false);
+                setStepTitle(cat ? cat.name : 'Produto', true);
+                updateAddButton();
+            }
         });
 
-        renderVariants(productMap[prodId].variants);
+        showOnlyStep(variantSection);
         clearAddons();
+        toggleSection(confirmSection, false);
+        setStepTitle(prod.name, true);
         updateAddButton();
+
+        renderVariants(prod.variants); // pode auto-avançar se houver 1 variante
     }
 
     // =========================================================================
-    // Renderização de variantes (tamanhos)
+    // ETAPA 3: Renderização de variantes (tamanhos)
     // =========================================================================
     function renderVariants(variants) {
         variantButtons.innerHTML = '';
-        toggleSection(variantSection, true);
 
         variants.forEach(function (v) {
+            var col = document.createElement('div');
+            col.className = 'col';
+
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-outline-secondary';
+            btn.className = 'btn btn-outline-secondary w-100';
             btn.dataset.variantId = v.id;
-            btn.innerHTML = '<span class="fw-medium">' + v.display + '</span>' +
-                            '<br><small>' + fmt(v.price) + '</small>';
+            btn.innerHTML =
+                '<span class="size-label">' + v.display + '</span>' +
+                '<span class="price-tag">' + fmt(v.price) + '</span>';
             btn.addEventListener('click', function () { selectVariant(v.id); });
-            variantButtons.appendChild(btn);
+
+            col.appendChild(btn);
+            variantButtons.appendChild(col);
         });
 
         if (variants.length === 1) selectVariant(variants[0].id);
@@ -180,8 +278,8 @@
         selectedVariantId = variantId;
 
         variantButtons.querySelectorAll('button').forEach(function (b) {
-            var active = String(b.dataset.variantId) === String(variantId);
-            b.className = 'btn ' + (active ? 'btn-primary' : 'btn-outline-secondary');
+            var isActive = String(b.dataset.variantId) === String(variantId);
+            b.className = 'btn w-100 ' + (isActive ? 'btn-primary' : 'btn-outline-secondary');
         });
 
         var v = variantMap[variantId];
@@ -190,16 +288,12 @@
         } else {
             clearAddons();
         }
+        toggleSection(confirmSection, true);
         updateAddButton();
     }
 
-    function clearVariants() {
-        variantButtons.innerHTML = '';
-        toggleSection(variantSection, false);
-    }
-
     // =========================================================================
-    // Renderização de adicionais
+    // ETAPA 4: Renderização de adicionais (apenas BUILD_YOUR_OWN)
     // =========================================================================
     function renderAddons(limit) {
         addonCheckboxes.innerHTML = '';
@@ -247,14 +341,14 @@
     }
 
     function refreshAddonBadges() {
-        var limit      = parseInt(addonSection.dataset.limit || '0', 10);
-        var freeSlots  = limit;
+        var limit     = parseInt(addonSection.dataset.limit || '0', 10);
+        var freeSlots = limit;
 
         addonCheckboxes.querySelectorAll('input[type="checkbox"]').forEach(function (inp) {
-            var badge         = addonCheckboxes.querySelector('[data-addon-badge="' + inp.dataset.addonId + '"]');
+            var badge        = addonCheckboxes.querySelector('[data-addon-badge="' + inp.dataset.addonId + '"]');
             if (!badge) return;
-            var isFreeOption  = inp.dataset.isFreeOption === '1';
-            var price         = parsePrice(inp.dataset.addonPrice);
+            var isFreeOption = inp.dataset.isFreeOption === '1';
+            var price        = parsePrice(inp.dataset.addonPrice);
 
             if (inp.checked && isFreeOption && freeSlots > 0) {
                 badge.textContent = 'Grátis';
@@ -269,9 +363,7 @@
             }
         });
 
-        var checkedFree = addonCheckboxes.querySelectorAll(
-            'input[data-is-free-option="1"]:checked'
-        ).length;
+        var checkedFree = addonCheckboxes.querySelectorAll('input[data-is-free-option="1"]:checked').length;
         var used        = Math.min(checkedFree, limit);
         updateAddonLimitInfo(limit - used);
     }
@@ -290,7 +382,58 @@
     }
 
     // =========================================================================
-    // Botão "Adicionar"
+    // Fluxo avulso (MANUAL)
+    // =========================================================================
+    function selectManualMode() {
+        currentMode = 'MANUAL';
+
+        stepHistory.push({
+            fn: function () {
+                currentMode = null;
+                showOnlyStep(catStep);
+                clearAddons();
+                toggleSection(confirmSection, false);
+                setStepTitle('Adicionar Item', false);
+                updateManualAddButton();
+            }
+        });
+
+        showOnlyStep(manualSection);
+        toggleSection(confirmSection, false);
+        setStepTitle('Item Avulso', true);
+        updateManualAddButton();
+        if (manualDescInput) manualDescInput.focus();
+    }
+
+    function updateManualAddButton() {
+        if (!btnAddManual) return;
+        var desc  = manualDescInput  ? manualDescInput.value.trim()          : '';
+        var price = manualPriceInput ? parseFloat(manualPriceInput.value) || 0 : 0;
+        btnAddManual.disabled = !(desc.length > 0 && price > 0);
+    }
+
+    function addManualItemToCart() {
+        var desc  = manualDescInput  ? manualDescInput.value.trim()          : '';
+        var price = manualPriceInput ? parseFloat(manualPriceInput.value) || 0 : 0;
+        var qty   = Math.max(1, parseInt(manualQtyInput ? manualQtyInput.value : '1', 10) || 1);
+
+        if (!desc || price <= 0) return;
+
+        cart.push({
+            itemType:    'MANUAL',
+            description: desc,
+            unitPrice:   price,
+            quantity:    qty,
+            addons:      [],
+            lineTotal:   price * qty,
+        });
+
+        renderCart();
+        resetItemBuilder();
+    }
+
+    // =========================================================================
+    // Botão "Adicionar ao pedido" (catálogo)
     // =========================================================================
     function updateAddButton() {
         if (btnAddItem) btnAddItem.disabled = !selectedVariantId;
@@ -302,10 +445,10 @@
         var v   = variantMap[selectedVariantId];
         var qty = Math.max(1, parseInt(itemQtyInput.value, 10) || 1);
 
-        var limit     = parseInt(addonSection.dataset.limit || '0', 10);
-        var freeSlots = limit;
+        var limit      = parseInt(addonSection.dataset.limit || '0', 10);
+        var freeSlots  = limit;
         var addonsCost = 0;
-        var addons = [];
+        var addons     = [];
 
         addonCheckboxes.querySelectorAll('input[type="checkbox"]:checked').forEach(function (inp) {
             var addon        = addonMap[inp.dataset.addonId];
@@ -321,17 +464,13 @@
                 addonsCost += cost;
             }
 
-            addons.push({
-                id:         addon.id,
-                name:       addon.name,
-                cost:       cost,
-                isIncluded: isIncluded,
-            });
+            addons.push({ id: addon.id, name: addon.name, cost: cost, isIncluded: isIncluded });
         });
 
         var lineTotal = (parsePrice(v.price) + addonsCost) * qty;
 
         cart.push({
+            itemType:       'CATALOG',
             variantId:      v.id,
             productName:    v.productName,
             variantDisplay: v.display,
@@ -349,8 +488,7 @@
     // Carrinho
     // =========================================================================
     function renderCart() {
-        var rows = cartTbody.querySelectorAll('tr[data-cart-row]');
-        rows.forEach(function (r) { r.remove(); });
+        cartTbody.querySelectorAll('tr[data-cart-row]').forEach(function (r) { r.remove(); });
 
         if (cart.length === 0) {
             toggleSection(cartEmptyRow, true);
@@ -366,25 +504,32 @@
             var tr = document.createElement('tr');
             tr.dataset.cartRow = idx;
 
-            var addonsHtml = '';
-            if (item.addons.length > 0) {
-                var parts = item.addons.map(function (a) {
-                    return a.isIncluded ? a.name : (a.name + ' (+' + fmt(a.cost) + ')');
-                });
-                addonsHtml = '<br><small class="text-muted">' + parts.join(', ') + '</small>';
+            var nameCell;
+            if (item.itemType === 'MANUAL') {
+                nameCell =
+                    '<strong>' + item.description + '</strong>' +
+                    ' <span class="badge bg-secondary ms-1" style="font-size:.65rem;vertical-align:middle">Avulso</span>';
+            } else {
+                var addonsHtml = '';
+                if (item.addons && item.addons.length > 0) {
+                    var parts = item.addons.map(function (a) {
+                        return a.isIncluded ? a.name : (a.name + ' (+' + fmt(a.cost) + ')');
+                    });
+                    addonsHtml = '<br><small class="text-muted">' + parts.join(', ') + '</small>';
+                }
+                nameCell =
+                    '<strong>' + item.productName + '</strong>' +
+                    (item.variantDisplay ? ' — ' + item.variantDisplay : '') +
+                    addonsHtml;
             }
 
             tr.innerHTML =
-                '<td class="ps-3">' +
-                    '<strong>' + item.productName + '</strong>' +
-                    (item.variantDisplay ? ' — ' + item.variantDisplay : '') +
-                    addonsHtml +
-                '</td>' +
+                '<td class="ps-3">' + nameCell + '</td>' +
                 '<td class="text-center">' + item.quantity + '</td>' +
                 '<td class="text-end pe-2 fw-medium">' + fmt(item.lineTotal) + '</td>' +
                 '<td class="text-center pe-2">' +
                     '<button type="button" class="btn btn-outline-danger btn-sm btn-remove-item" ' +
-                    'data-remove-idx="' + idx + '" style="width:34px;height:34px;padding:0" title="Remover">' +
+                    'data-remove-idx="' + idx + '" style="width:30px;height:30px;min-height:unset;padding:0" title="Remover">' +
                     '&times;</button>' +
                 '</td>';
 
@@ -416,26 +561,31 @@
     }
 
     // =========================================================================
-    // Reset do seletor após adicionar um item
+    // Reset do builder após adicionar item
     // =========================================================================
     function resetItemBuilder() {
         selectedCatId     = null;
         selectedProdId    = null;
         selectedVariantId = null;
+        currentMode       = null;
+        stepHistory.length = 0;
 
-        catButtons.querySelectorAll('button').forEach(function (b) {
-            b.className = 'btn btn-outline-secondary';
-        });
-        prodButtons.innerHTML = '';
-        toggleSection(prodSection, false);
-        clearVariants();
+        showOnlyStep(catStep);
+        prodButtons.innerHTML    = '';
+        variantButtons.innerHTML = '';
         clearAddons();
-        if (itemQtyInput) itemQtyInput.value = 1;
+        toggleSection(confirmSection, false);
+        if (itemQtyInput)     itemQtyInput.value     = 1;
+        if (manualDescInput)  manualDescInput.value  = '';
+        if (manualPriceInput) manualPriceInput.value = '';
+        if (manualQtyInput)   manualQtyInput.value   = 1;
         updateAddButton();
+        updateManualAddButton();
+        setStepTitle('Adicionar Item', false);
     }
 
     // =========================================================================
-    // Envio do formulário — injeta itens do carrinho como campos ocultos
+    // Envio do formulário — injeta itens como campos ocultos
     // =========================================================================
     function handleSubmit(e) {
         if (cart.length === 0) {
@@ -448,6 +598,11 @@
             return;
         }
 
+        // Persiste o carrinho para restauração se houver erro de validação server-side
+        if (cartStateInput) {
+            cartStateInput.value = JSON.stringify(cart);
+        }
+
         formItems.innerHTML = '';
         cart.forEach(function (item) {
             function hidden(name, val) {
@@ -457,9 +612,22 @@
                 inp.value = val;
                 formItems.appendChild(inp);
             }
-            hidden('item_variant_id[]', item.variantId);
-            hidden('item_quantity[]',   item.quantity);
-            hidden('item_addon_ids[]',  item.addons.map(function (a) { return a.id; }).join(','));
+
+            var itype = item.itemType || 'CATALOG';
+            hidden('item_type[]',     itype);
+            hidden('item_quantity[]', item.quantity);
+
+            if (itype === 'MANUAL') {
+                hidden('item_variant_id[]',         '');
+                hidden('item_addon_ids[]',          '');
+                hidden('item_manual_description[]', item.description);
+                hidden('item_manual_unit_price[]',  item.unitPrice.toFixed(2));
+            } else {
+                hidden('item_variant_id[]',         item.variantId);
+                hidden('item_addon_ids[]',          item.addons.map(function (a) { return a.id; }).join(','));
+                hidden('item_manual_description[]', '');
+                hidden('item_manual_unit_price[]',  '');
+            }
         });
     }
 
@@ -474,15 +642,59 @@
         renderCart();
     });
 
-    if (btnAddItem)  btnAddItem.addEventListener('click', addItemToCart);
-    if (orderForm)   orderForm.addEventListener('submit', handleSubmit);
+    if (btnAddItem)    btnAddItem.addEventListener('click', addItemToCart);
+    if (btnAddManual)  btnAddManual.addEventListener('click', addManualItemToCart);
+    if (btnManualItem) btnManualItem.addEventListener('click', selectManualMode);
+    if (orderForm)     orderForm.addEventListener('submit', handleSubmit);
     if (informedInput) informedInput.addEventListener('input', updateTotal);
+    if (btnBackStep)   btnBackStep.addEventListener('click', goBack);
+
+    if (btnQtyDec) {
+        btnQtyDec.addEventListener('click', function () {
+            var v = parseInt(itemQtyInput.value, 10) || 1;
+            if (v > 1) itemQtyInput.value = v - 1;
+        });
+    }
+    if (btnQtyInc) {
+        btnQtyInc.addEventListener('click', function () {
+            var v = parseInt(itemQtyInput.value, 10) || 1;
+            if (v < 99) itemQtyInput.value = v + 1;
+        });
+    }
+
+    if (btnManualQtyDec) {
+        btnManualQtyDec.addEventListener('click', function () {
+            var v = parseInt(manualQtyInput.value, 10) || 1;
+            if (v > 1) manualQtyInput.value = v - 1;
+        });
+    }
+    if (btnManualQtyInc) {
+        btnManualQtyInc.addEventListener('click', function () {
+            var v = parseInt(manualQtyInput.value, 10) || 1;
+            if (v < 99) manualQtyInput.value = v + 1;
+        });
+    }
+
+    if (manualDescInput)  manualDescInput.addEventListener('input', updateManualAddButton);
+    if (manualPriceInput) manualPriceInput.addEventListener('input', updateManualAddButton);
 
     // =========================================================================
     // Inicialização
     // =========================================================================
+
+    // Restaura o carrinho se a página re-renderizou por erro de validação
+    if (cartStateInput && cartStateInput.value) {
+        try {
+            var savedCart = JSON.parse(cartStateInput.value);
+            if (Array.isArray(savedCart) && savedCart.length > 0) {
+                cart = savedCart;
+            }
+        } catch (e) {}
+    }
+
     renderCategories();
     renderCart();
     updateAddButton();
+    updateManualAddButton();
 
 }());

@@ -134,8 +134,8 @@ class TestOrderCreateViewValidation:
             'item_addon_ids[]': [''],
         })
         assert response.status_code == 200
-        messages_list = list(response.wsgi_request._messages)
-        assert any('comanda' in str(m).lower() for m in messages_list)
+        errors = response.context['form_errors']
+        assert any('comanda' in e.lower() for e in errors)
 
     def test_missing_order_time_shows_error(self, db):
         variant = _standard_variant(db)
@@ -148,8 +148,8 @@ class TestOrderCreateViewValidation:
             'item_addon_ids[]': [''],
         })
         assert response.status_code == 200
-        messages_list = list(response.wsgi_request._messages)
-        assert any('horário' in str(m).lower() for m in messages_list)
+        errors = response.context['form_errors']
+        assert any('horário' in e.lower() for e in errors)
 
     def test_no_items_shows_error(self, db):
         response = self._post(db, {
@@ -159,8 +159,8 @@ class TestOrderCreateViewValidation:
             'payment_method': 'PIX',
         })
         assert response.status_code == 200
-        messages_list = list(response.wsgi_request._messages)
-        assert any('item' in str(m).lower() for m in messages_list)
+        errors = response.context['form_errors']
+        assert any('item' in e.lower() for e in errors)
 
     def test_missing_payment_method_shows_error(self, db):
         variant = _standard_variant(db)
@@ -173,8 +173,8 @@ class TestOrderCreateViewValidation:
             'item_addon_ids[]': [''],
         })
         assert response.status_code == 200
-        messages_list = list(response.wsgi_request._messages)
-        assert any('pagamento' in str(m).lower() for m in messages_list)
+        errors = response.context['form_errors']
+        assert any('pagamento' in e.lower() for e in errors)
 
 
 # ============================================================================

@@ -146,11 +146,12 @@ class OrderFactory(DjangoModelFactory):
 
 
 class OrderItemFactory(DjangoModelFactory):
-    """Factory para criar itens de pedido."""
+    """Factory para criar itens de pedido do tipo CATALOG."""
     class Meta:
         model = OrderItem
 
     order = factory.SubFactory(OrderFactory)
+    item_type = OrderItem.ItemType.CATALOG
     product = factory.SubFactory(ProductFactory)
     variant = factory.SubFactory(ProductVariantFactory)
     quantity = 1
@@ -160,6 +161,24 @@ class OrderItemFactory(DjangoModelFactory):
     unit_price = Decimal('18.00')
     addons_total = Decimal('0.00')
     line_total = Decimal('18.00')
+
+
+class ManualOrderItemFactory(DjangoModelFactory):
+    """Factory para criar itens de pedido do tipo MANUAL (avulso)."""
+    class Meta:
+        model = OrderItem
+
+    order = factory.SubFactory(OrderFactory)
+    item_type = OrderItem.ItemType.MANUAL
+    product = None
+    variant = None
+    quantity = 1
+    product_name = 'Copo descartável'
+    variant_name = ''
+    size_name = ''
+    unit_price = Decimal('1.00')
+    addons_total = Decimal('0.00')
+    line_total = Decimal('1.00')
 
 
 class OrderItemAddonFactory(DjangoModelFactory):

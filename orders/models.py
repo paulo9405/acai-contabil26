@@ -309,19 +309,35 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     """
-    Item de um pedido. Armazena snapshots do produto e preço no momento do lançamento.
-    Múltiplos itens por pedido são a regra, não a exceção.
+    Item de um pedido. Pode ser de catálogo (CATALOG) ou avulso (MANUAL).
+
+    CATALOG: product e variant obrigatórios; preço e snapshots do catálogo; pode ter adicionais.
+    MANUAL: product/variant NULL; funcionário informa descrição (product_name), unit_price e quantity;
+            sem adicionais, addons_total=0, line_total = unit_price × quantity.
     """
+
+    class ItemType(models.TextChoices):
+        CATALOG = 'CATALOG', 'Catálogo'
+        MANUAL = 'MANUAL', 'Avulso'
+
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
         related_name='items',
         verbose_name='Pedido'
     )
+    item_type = models.CharField(
+        max_length=10,
+        choices=ItemType.choices,
+        default=ItemType.CATALOG,
+        verbose_name='Tipo de item',
+        help_text='CATALOG: produto do catálogo; MANUAL: item avulso sem catálogo',
+    )
     product = models.ForeignKey(
         'Product',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name='order_items',
         verbose_name='Produto'
     )
@@ -329,6 +345,7 @@ class OrderItem(models.Model):
         'ProductVariant',
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name='order_items',
         verbose_name='Variação'
     )
@@ -360,7 +377,28 @@ class OrderItem(models.Model):
         verbose_name_plural = 'Itens do Pedido'
         indexes = [
             models.Index(fields=['product']),
+            models.Index(fields=['item_type']),
         ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.item_type == self.ItemType.CATALOG:
+            if self.product_id is None:
+                errors['product'] = 'Produto é obrigatório para item de catálogo.'
+            if self.variant_id is None:
+                errors['variant'] = 'Variação é obrigatória para item de catálogo.'
+        elif self.item_type == self.ItemType.MANUAL:
+            if self.product_id is not None:
+                errors['product'] = 'Item avulso não deve referenciar produto do catálogo.'
+            if self.variant_id is not None:
+                errors['variant'] = 'Item avulso não deve referenciar variação do catálogo.'
+            if not self.product_name or not self.product_name.strip():
+                errors['product_name'] = 'Descrição é obrigatória para item avulso.'
+            if self.unit_price is None or self.unit_price <= Decimal('0.00'):
+                errors['unit_price'] = 'Valor unitário deve ser maior que zero para item avulso.'
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return f"{self.product_name} × {self.quantity} — R$ {self.line_total}"

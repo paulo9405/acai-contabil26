@@ -125,14 +125,95 @@ def _resolve_addon_assignments(variant, addons):
 # create_order
 # ---------------------------------------------------------------------------
 
+def _create_catalog_item(*, order, item_data):
+    """Cria um OrderItem de catálogo e retorna o line_total."""
+    variant = item_data['variant']
+    quantity = item_data['quantity']
+    addons = item_data.get('addons', [])
+
+    product = variant.product
+    size = variant.size
+
+    addons_total, addon_assignments = _resolve_addon_assignments(variant, addons)
+
+    unit_price = variant.price
+    line_total = (unit_price + addons_total) * quantity
+
+    order_item = OrderItem.objects.create(
+        order=order,
+        item_type=OrderItem.ItemType.CATALOG,
+        product=product,
+        variant=variant,
+        quantity=quantity,
+        product_name=product.name,
+        variant_name=size.name if size else '',
+        size_name=size.name if size else '',
+        unit_price=unit_price,
+        addons_total=addons_total,
+        line_total=line_total,
+    )
+
+    for a in addon_assignments:
+        OrderItemAddon.objects.create(
+            order_item=order_item,
+            addon=a['addon'],
+            name=a['name'],
+            unit_price=a['unit_price'],
+            quantity=1,
+            is_included=a['is_included'],
+            line_total=a['line_total'],
+        )
+
+    return line_total
+
+
+def _create_manual_item(*, order, item_data):
+    """Cria um OrderItem avulso (MANUAL) e retorna o line_total."""
+    description = str(item_data.get('description', '')).strip()
+    unit_price = item_data.get('unit_price')
+    quantity = item_data.get('quantity', 1)
+
+    if not description:
+        raise ValueError('Descrição é obrigatória para item avulso.')
+    if unit_price is None or unit_price <= Decimal('0.00'):
+        raise ValueError('Valor unitário deve ser maior que zero para item avulso.')
+
+    line_total = unit_price * quantity
+
+    OrderItem.objects.create(
+        order=order,
+        item_type=OrderItem.ItemType.MANUAL,
+        product=None,
+        variant=None,
+        quantity=quantity,
+        product_name=description,
+        variant_name='',
+        size_name='',
+        unit_price=unit_price,
+        addons_total=Decimal('0.00'),
+        line_total=line_total,
+    )
+
+    return line_total
+
+
 def create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by, notes='', informed_total=None):
     """
     Cria um pedido completo com itens e adicionais em transaction.atomic.
 
-    Parâmetro `items`: lista de dicts com:
+    Parâmetro `items`: lista de dicts. Cada dict pode ser:
+
+    Item de catálogo (padrão):
         - 'variant': ProductVariant
         - 'quantity': int (>= 1)
         - 'addons': list[Addon] (opcional, default [])
+        - 'item_type': 'CATALOG' (opcional, inferido automaticamente)
+
+    Item avulso (manual):
+        - 'item_type': OrderItem.ItemType.MANUAL  (obrigatório para identificar)
+        - 'description': str  (obrigatório — armazenado em product_name)
+        - 'unit_price': Decimal  (obrigatório, > 0)
+        - 'quantity': int (>= 1)
 
     Retorna o Order criado.
     """
@@ -152,43 +233,11 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
         order_total = Decimal('0.00')
 
         for item_data in items:
-            variant = item_data['variant']
-            quantity = item_data['quantity']
-            addons = item_data.get('addons', [])
-
-            product = variant.product
-            size = variant.size
-
-            addons_total, addon_assignments = _resolve_addon_assignments(variant, addons)
-
-            unit_price = variant.price
-            line_total = (unit_price + addons_total) * quantity
-
-            order_item = OrderItem.objects.create(
-                order=order,
-                product=product,
-                variant=variant,
-                quantity=quantity,
-                product_name=product.name,
-                variant_name=size.name if size else '',
-                size_name=size.name if size else '',
-                unit_price=unit_price,
-                addons_total=addons_total,
-                line_total=line_total,
-            )
-
-            for a in addon_assignments:
-                OrderItemAddon.objects.create(
-                    order_item=order_item,
-                    addon=a['addon'],
-                    name=a['name'],
-                    unit_price=a['unit_price'],
-                    quantity=1,
-                    is_included=a['is_included'],
-                    line_total=a['line_total'],
-                )
-
-            order_total += line_total
+            item_type = item_data.get('item_type', OrderItem.ItemType.CATALOG)
+            if item_type == OrderItem.ItemType.MANUAL:
+                order_total += _create_manual_item(order=order, item_data=item_data)
+            else:
+                order_total += _create_catalog_item(order=order, item_data=item_data)
 
         order.total = order_total
         order.save(update_fields=['total', 'updated_at'])

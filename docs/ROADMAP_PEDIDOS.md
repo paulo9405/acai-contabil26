@@ -264,17 +264,24 @@ A `DailyClosingUnifiedView` em `finance/views.py` é o modelo de referência par
 |---|---|---|
 | `id` | BigAutoField | PK |
 | `order` | FK(Order, CASCADE) | |
-| `product` | FK(Product, SET_NULL, null=True) | referência viva |
-| `variant` | FK(ProductVariant, SET_NULL, null=True) | referência viva |
-| `quantity` | PositiveIntegerField | |
-| `product_name` | CharField(200) | **snapshot histórico** |
-| `variant_name` | CharField(100, blank) | **snapshot histórico** |
-| `size_name` | CharField(50, blank) | **snapshot histórico** |
-| `unit_price` | DecimalField(10,2) | **snapshot histórico** |
-| `addons_total` | DecimalField(10,2) | soma dos adicionais pagos |
+| `item_type` | CharField choices | `CATALOG`, `MANUAL` — default `CATALOG` (P-13 / DA-20) |
+| `product` | FK(Product, SET_NULL, null=True) | referência viva; **NULL quando `item_type=MANUAL`** |
+| `variant` | FK(ProductVariant, SET_NULL, null=True) | referência viva; **NULL quando `item_type=MANUAL`** |
+| `quantity` | PositiveIntegerField | obrigatório em ambos os tipos |
+| `product_name` | CharField(200) | **snapshot histórico**; em `MANUAL` **guarda a descrição digitada** (DA-21) |
+| `variant_name` | CharField(100, blank) | **snapshot histórico**; vazio em `MANUAL` |
+| `size_name` | CharField(50, blank) | **snapshot histórico**; vazio em `MANUAL` |
+| `unit_price` | DecimalField(10,2) | **snapshot histórico**; em `MANUAL` é o valor unitário digitado |
+| `addons_total` | DecimalField(10,2) | soma dos adicionais pagos; sempre `0` em `MANUAL` |
 | `line_total` | DecimalField(10,2) | (unit_price + addons_total) × quantity |
 
 **Índice:** `['product']`.
+
+**Tipo do item (`item_type` — decidido em P-13, DA-20/DA-21):**
+- `CATALOG` — comportamento original: `product` e `variant` obrigatórios, preço vem da `ProductVariant`, snapshots preenchidos a partir do catálogo, pode ter adicionais (`OrderItemAddon`).
+- `MANUAL` — item avulso sem catálogo: `product=NULL`, `variant=NULL`. O funcionário informa apenas **descrição** (armazenada em `product_name`), **valor unitário** (`unit_price`) e **quantidade** (`quantity`). Não possui adicionais; `addons_total=0` e `line_total = unit_price × quantity`.
+- Validação de consistência fica no `clean()` do `OrderItem` **e** é respeitada pelos services (ver Seção 6 → "Item de catálogo × item manual").
+- **Nenhum model novo é criado.** O mesmo `OrderItem` representa ambos os casos.
 
 #### `OrderItemAddon`
 | Campo | Tipo | Notas |
@@ -306,6 +313,8 @@ User 1──* Order 1──* OrderItem 1──* OrderItemAddon
 
 FKs de catálogo em itens usam `SET_NULL` para nunca quebrar pedidos ao editar/remover produtos. Os snapshots preservam a informação histórica.
 
+Um `OrderItem` pode ser de dois tipos (`item_type`): **`CATALOG`** (ligado a `Product`/`ProductVariant`) ou **`MANUAL`** (avulso, `product`/`variant` = NULL). Itens `MANUAL` não possuem `OrderItemAddon`. Ver Seção 6 → "Item de catálogo × item manual" e DA-20/DA-21.
+
 ---
 
 ## 6. Principais Regras de Negócio
@@ -320,6 +329,30 @@ FKs de catálogo em itens usam `SET_NULL` para nunca quebrar pedidos ao editar/r
 - Cada item é representado por um **`OrderItem` independente** (com seus próprios snapshots e adicionais).
 - O total do pedido é a **soma dos `line_total` de todos os `OrderItems`**.
 - Esta regra é estrutural: nenhuma implementação futura deve assumir que um pedido tem apenas um item.
+
+### Item de catálogo × item manual (avulso)
+- Todo `OrderItem` tem um campo `item_type` com dois valores: **`CATALOG`** (padrão) e **`MANUAL`**.
+- **Motivação (decidido — P-13):** a loja tem vendas excepcionais cujo valor não está no catálogo — copo descartável (R$ 1,00), cobrança de embalagem, taxa eventual, promoção especial, venda avulsa, item ainda não cadastrado. Esses casos precisam existir no sistema **sem poluir o catálogo com produtos fictícios** e **sem criar outro model** (DA-20).
+
+**Quando `item_type == CATALOG`** (comportamento original, inalterado):
+- `product` **obrigatório**; `variant` **obrigatória**.
+- `unit_price` obtido da `ProductVariant` (snapshot).
+- Snapshots (`product_name`, `variant_name`, `size_name`) preenchidos a partir do catálogo.
+- Pode ter adicionais (`OrderItemAddon`), incluindo a lógica de "Monte seu Açaí".
+
+**Quando `item_type == MANUAL`** (item avulso):
+- `product = NULL`; `variant = NULL`.
+- **Descrição obrigatória** — digitada pelo funcionário e armazenada em `product_name` (ex.: "Copo descartável", "Venda avulsa", "Promoção especial").
+- **Valor unitário obrigatório** — digitado em `unit_price`.
+- **Quantidade obrigatória** — `quantity`.
+- `variant_name` e `size_name` ficam vazios; `addons_total = 0`; **sem `OrderItemAddon`**.
+- `line_total = unit_price × quantity`.
+
+**Validações (no `clean()` do `OrderItem` e reforçadas nos services):**
+- `CATALOG` → `product` e `variant` presentes; descrição/valor manuais não são exigidos (vêm do catálogo).
+- `MANUAL` → `product` e `variant` **devem** ser NULL; `product_name` (descrição), `unit_price` (valor) e `quantity` **obrigatórios**.
+
+O total do pedido continua sendo a soma dos `line_total` de todos os `OrderItems`, **sem qualquer diferença de cálculo entre os tipos** — apenas a origem dos dados muda.
 
 ### Preço histórico
 - No momento do lançamento, o service `create_order` congela em `OrderItem` os campos: `unit_price`, `product_name`, `variant_name`, `size_name`, `addons_total`, `line_total`.
@@ -342,6 +375,8 @@ OrderItem.line_total   = (unit_price + addons_total) × quantity
 
 Order.total = sum(line_total de todos os OrderItems)
 ```
+
+Itens `MANUAL` entram nesta mesma fórmula com `addons_total = 0`, ou seja `line_total = unit_price × quantity`. Nenhuma alteração no cálculo do `Order.total`.
 
 ### Número da comanda (SEM unicidade)
 - A loja usa **blocos físicos de comandas numerados de 1 a 50**. Quando o bloco acaba, começa um novo bloco novamente do número 1.
@@ -402,6 +437,18 @@ Order.total = sum(line_total de todos os OrderItems)
 | DA-17 | Janela de edição do funcionário atrelada à existência de `DailyClosing` do dia | Decidido em P-04: funcionário edita enquanto o dia não foi fechado; após o fechamento, só `is_superuser`. Consulta simples de existência, independente da integração da Fase 6. |
 | DA-18 | Pagamentos apenas `PIX`/`CASH`/`CARD` na v1 (sem `OTHER`) | Decidido em P-07. Novas formas ficam para versões futuras, evitando complexidade prematura. |
 | DA-19 | Excedente de adicionais no "Monte seu Açaí" vira pago automaticamente, sem bloquear | Decidido em P-06. Preserva a velocidade do lançamento e reflete a prática da loja. |
+| DA-20 | **Item avulso via `OrderItem.item_type` (`CATALOG`/`MANUAL`) — sem novo model** | Decidido em P-13. Vendas excepcionais (copo, embalagem, taxa, promoção, item não cadastrado) precisam existir no sistema. Reutilizar o `OrderItem` com um tipo lógico é superior a criar um novo model **e** a criar produtos fictícios no catálogo. Ver justificativa abaixo. |
+| DA-21 | **Item `MANUAL` reutiliza `product_name` como descrição; sem adicionais; total idêntico** | O `OrderItem` já possui `product_name` (snapshot), `unit_price` e `quantity`. Reaproveitá-los para o item manual evita qualquer campo novo além de `item_type`, mantém relatórios e cálculo de `Order.total` exatamente iguais e preserva o conceito único de "item do pedido". Alinha-se ao DA-16 (reutilizar antes de criar). |
+
+#### Por que `item_type` no `OrderItem` é melhor do que criar um novo model
+
+- **Um único conceito de item.** Todo o código de leitura, escrita, relatórios e templates continua operando sobre `OrderItem`. Um model separado exigiria duplicar seleção, agregação, exibição e o cálculo de `Order.total` para duas entidades.
+- **Sem produtos fictícios no catálogo.** Não é preciso poluir `Product`/`ProductVariant` com entradas artificiais ("Copo", "Taxa") — o catálogo permanece limpo e fiel ao cardápio real.
+- **Relatórios consistentes.** Faturamento, ticket médio, vendas por forma de pagamento e totais diários continuam somando `OrderItem.line_total` / `Order.total` sem exceções nem uniões de tabelas.
+- **Snapshots históricos preservados.** O item manual usa os mesmos campos de snapshot já existentes; nada retroage ao editar o catálogo.
+- **Cálculo de total idêntico.** `line_total` e `Order.total` seguem a mesma fórmula; o item manual é apenas `addons_total = 0`.
+- **Menor complexidade e menos migrations.** Uma coluna nova (`item_type`) contra uma tabela nova com FKs, índices, admin, factories e queries próprias. YAGNI e simplicidade (PROJECT_RULES §1).
+- **Reuso máximo (DA-16).** Aproveita models, services, selectors, templates e o padrão de POST-arrays já existentes.
 
 ---
 
@@ -458,6 +505,8 @@ Order.total = sum(line_total de todos os OrderItems)
 | R-05 | Cobertura de testes cair abaixo de 80% | Média | Médio | Adicionar factories e testes a cada fase; monitorar com `--cov-fail-under=80`. |
 | R-06 | Catálogo desatualizado (preços mudam) | Alta | Médio | Management command idempotente; Admin acessível. |
 | R-07 | Implementação futura assumir erroneamente unicidade da comanda | Média | Alto | Documentado explicitamente (Seção 6, DA-04); nenhuma `UniqueConstraint`/índice único sobre `comanda_number`; conferência sempre por `Order.id`. |
+| R-08 | Item `MANUAL` inconsistente (com FK de catálogo preenchida, ou sem descrição/valor) | Média | Médio | Validação no `clean()` do `OrderItem` **e** nos services (`create_order`/`update_order`); testes cobrindo ambos os tipos. |
+| R-09 | Item `MANUAL` poluir relatórios de produto/tamanho | Baixa | Baixo | Item manual não tem `size_name`, logo fica fora de "tamanhos vendidos" e "litros"; aparece em "produtos" sob sua descrição (comportamento aceito — mantém faturamento correto). Avaliar filtro por `item_type` nos relatórios se necessário. |
 
 ---
 
@@ -479,6 +528,7 @@ Order.total = sum(line_total de todos os OrderItems)
 | P-10 | Divergência informado × calculado? | **Apenas alerta visual** na v1. Relatório específico é futuro. | ✅ Resolvida |
 | P-11 | Precisão do horário? | **`HH:MM`** (sem segundos). | ✅ Resolvida |
 | P-12 | Adicionais com múltiplas unidades? | **Não na v1.** Uma seleção = uma unidade. Evolução futura. | ✅ Resolvida |
+| P-13 | Como registrar vendas avulsas fora do catálogo (copo, embalagem, taxa, item não cadastrado)? | **`OrderItem.item_type` = `CATALOG`/`MANUAL`.** Item `MANUAL` sem catálogo (descrição + valor + quantidade), reutilizando o próprio `OrderItem` — sem novo model e sem produtos fictícios (DA-20/DA-21). | ✅ Resolvida (2026-07-15) |
 
 ---
 
@@ -601,7 +651,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 3 — Pedidos e Itens
-**Status: ✅ Concluída**
+**Status: ✅ Concluída** — ✅ **Adendo (P-13 / DA-20 / DA-21) implementado em 2026-07-15** (ver checklist "Adendo" abaixo e Diário de Desenvolvimento).
 
 **Objetivo:** Implementar `Order`, `OrderItem`, `OrderItemAddon`, services de criação/atualização/cancelamento com cálculo correto de totais em `transaction.atomic`.
 
@@ -632,6 +682,14 @@ Order.total = sum(line_total de todos os OrderItems)
 - [x] Gerar migração
 - [x] Adicionar factories ao `conftest.py`
 
+**Adendo — Item avulso (`item_type`) — P-13 / DA-20 / DA-21:**
+- [x] Adicionar `OrderItem.item_type` (`TextChoices` `CATALOG`/`MANUAL`, default `CATALOG`)
+- [x] `clean()` no `OrderItem`: `CATALOG` exige `product`+`variant`; `MANUAL` exige `product`/`variant` NULL + `product_name`(descrição)+`unit_price`+`quantity`
+- [x] `create_order`: aceitar itens `MANUAL` (descrição, valor, quantidade) além dos `CATALOG`; item `MANUAL` sem adicionais, `addons_total=0`, `line_total = unit_price × quantity`
+- [x] Garantir que `Order.total` soma itens `CATALOG` e `MANUAL` sem diferença de cálculo
+- [x] Gerar nova migration para o campo `item_type`
+- [x] Atualizar `OrderItemFactory` no `conftest.py` para cobrir `MANUAL`
+
 **Testes esperados:**
 - Criar pedido com múltiplos itens (ex.: Açaí Monte 300ml + Açaí Nutella 500ml + 2 Coca-Cola)
 - Cálculo correto de `line_total`, `addons_total`, `order.total`
@@ -643,12 +701,20 @@ Order.total = sum(line_total de todos os OrderItems)
 - Cancelamento com auditoria e **motivo obrigatório** (cancelar sem motivo deve falhar)
 - Divergência informado × calculado (aviso, não erro)
 - Validação de `payment_method` (apenas `PIX`/`CASH`/`CARD`)
+- **Item `MANUAL` criado com descrição + valor + quantidade; `product`/`variant` NULL; `line_total = unit_price × quantity`**
+- **Pedido misto (itens `CATALOG` + `MANUAL`) soma `Order.total` corretamente**
+- **`clean()` rejeita `MANUAL` com `product`/`variant` preenchidos**
+- **`clean()` rejeita `MANUAL` sem descrição, sem valor ou sem quantidade**
+- **`clean()` rejeita `CATALOG` sem `product`/`variant`**
+- **Item `MANUAL` não gera `OrderItemAddon` (`addons_total = 0`)**
 
 **Critérios de aceite:**
 - [x] Criar pedido completo via shell/testes com totais corretos
 - [x] Preço histórico isolado de mudanças no catálogo
 - [x] Nenhuma constraint de unicidade sobre `comanda_number`
 - [x] Cobertura ≥ 80%
+- [x] Item avulso (`MANUAL`) criável via service com total correto (adendo P-13)
+- [x] Validações de `item_type` cobertas por testes (adendo P-13)
 
 ---
 
@@ -685,8 +751,14 @@ Order.total = sum(line_total de todos os OrderItems)
 - [x] Mensagens de sucesso/erro via `messages`
 - [ ] Testar em mobile (390px) — pendente: validação visual em dispositivo real
 
+**Adendo — Item avulso na tela de lançamento (P-13 / DA-20, pendente):**
+- [ ] Opção "Item avulso/manual" no fluxo de adicionar item (descrição + valor + quantidade)
+- [ ] JS: item `MANUAL` entra no carrinho e soma ao total como qualquer outro item
+- [ ] POST envia itens `MANUAL` (arrays de descrição/valor/quantidade) e a view os repassa ao `create_order`
+
 **Testes esperados:**
 - POST cria pedido + itens + adicionais corretamente
+- **POST com item `MANUAL` (descrição + valor + quantidade) cria o pedido com total correto** (adendo P-13)
 - Alerta de divergência aparece mas não bloqueia
 - Usuário sem grupo adequado recebe 403
 - Campos de horário e número da comanda são obrigatórios
@@ -820,10 +892,16 @@ Order.total = sum(line_total de todos os OrderItems)
 - [x] Relatório de horário de pico com agrupamento por hora
 - [x] Relatório de divergências
 
+**Adendo — Itens `MANUAL` nos relatórios (P-13 / DA-20, revisar):**
+- [ ] Confirmar que faturamento/ticket/pagamentos/totais diários incluem itens `MANUAL` (somam `Order.total` — já correto por construção)
+- [ ] Itens `MANUAL` ficam fora de "tamanhos" e "litros" (sem `size_name`/`variant`) — comportamento esperado
+- [ ] Avaliar se "produtos mais vendidos" deve filtrar por `item_type=CATALOG` (item manual aparece sob a descrição) — ver R-09
+
 **Testes esperados:**
 - Cada agregação testada com dataset de fixture
 - Relatório de litros correto
 - Horário de pico identifica hora com mais pedidos
+- **Item `MANUAL` entra no faturamento total, mas não em "litros"/"tamanhos"** (adendo P-13)
 
 **Critérios de aceite:**
 - [x] Relatórios exibem dados coerentes com os pedidos lançados
@@ -1120,6 +1198,57 @@ Implementação completa do módulo de relatórios de pedidos, acessível apenas
 
 ---
 
+### Adendo Fase 3 — Item avulso (`item_type`) — P-13 / DA-20 / DA-21
+**Data:** 2026-07-15
+**Fase:** 3 — Pedidos e Itens (adendo)
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Implementação do suporte a itens avulsos (`item_type=MANUAL`) no `OrderItem`. O model ganhou `ItemType` TextChoices com `CATALOG`/`MANUAL` (default `CATALOG`), campo `item_type` e método `clean()` com validações de consistência. O `create_order` foi refatorado em dois helpers internos — `_create_catalog_item` e `_create_manual_item` — mantendo o loop principal limpo. Itens `MANUAL` recebem descrição em `product_name`, `unit_price` e `quantity` definidos pelo funcionário, `product`/`variant` NULL, `addons_total=0` e `line_total = unit_price × quantity`. Compatibilidade total com itens `CATALOG` existentes preservada.
+
+**Arquivos modificados/criados:**
+- `orders/models.py` — `OrderItem.ItemType`, campo `item_type`, índice `['item_type']`, método `clean()`, `blank=True` nos FKs `product`/`variant`
+- `orders/services.py` — `_create_catalog_item`, `_create_manual_item`; loop `create_order` simplificado
+- `orders/migrations/0004_orderitem_item_type.py`
+- `tests/conftest.py` — `OrderItemFactory` + `item_type=CATALOG`; nova `ManualOrderItemFactory`
+- `tests/test_orders_manual_item.py` — 24 novos testes
+
+**Migrações criadas:** `orders/migrations/0004_orderitem_item_type.py`
+
+**Testes executados:** 296 passando (24 novos), cobertura total 87.99%. `orders/services.py` com 100% de cobertura.
+
+**Decisões registradas:** DA-20 e DA-21 (já documentadas na sessão anterior).
+
+**Pendências encontradas:** UI da tela de lançamento (adendo Fase 4) e revisão de relatórios (adendo Fase 7) não implementados — fora do escopo desta tarefa. Fase 8 pode iniciar quando aprovada.
+
+---
+
+### Revisão do Roadmap — Item avulso (`item_type`)
+**Data:** 2026-07-15
+**Fase:** Revisão de documentação (nenhuma implementação)
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Nova decisão arquitetural incorporada ao roadmap: vendas excepcionais fora do catálogo (copo descartável, embalagem, taxa eventual, promoção, item não cadastrado) passam a ser representadas pelo próprio `OrderItem` por meio de um tipo lógico `item_type` (`CATALOG`/`MANUAL`), **sem criar novo model e sem produtos fictícios no catálogo**. Item `MANUAL` reutiliza `product_name` como descrição, `unit_price` e `quantity`, com `product`/`variant` NULL, sem adicionais e com cálculo de `Order.total` idêntico. Registrada a pendência P-13 (resolvida) e as decisões DA-20/DA-21, incluindo a justificativa de por que reutilizar o `OrderItem` supera criar um model novo.
+
+**Principais mudanças:**
+- Seção 5: `OrderItem` ganhou `item_type`; anotações de `product`/`variant`/`product_name`/`addons_total` para o caso `MANUAL`; bloco explicativo "Tipo do item"; nota no diagrama.
+- Seção 6: nova regra "Item de catálogo × item manual (avulso)"; nota no bloco de cálculo de totais.
+- Seção 7: DA-20 e DA-21 + seção "Por que `item_type` no `OrderItem` é melhor do que criar um novo model".
+- Seção 10: riscos R-08 (consistência do item manual) e R-09 (relatórios).
+- Seção 11: pendência P-13 adicionada como ✅ Resolvida.
+- Seção 12: Fase 3 com nota de adendo pendente + itens de checklist/testes/critérios; Fase 4 com adendo de UI; Fase 7 com adendo de relatórios.
+
+**Arquivos modificados:** `docs/ROADMAP_PEDIDOS.md`.
+
+**Migrações criadas:** nenhuma (implementação pendente — exigirá migration para `OrderItem.item_type`).
+
+**Testes executados:** nenhum.
+
+**Pendências encontradas:** implementar o adendo P-13/DA-20/DA-21 (campo `item_type`, `clean()`, `create_order`, migration, testes, UI e revisão de relatórios). **Aguardando aprovação do Paulo antes de implementar.**
+
+---
+
 > *As próximas entradas serão adicionadas aqui ao final de cada fase.*
 
 ---
@@ -1147,6 +1276,7 @@ Implementação completa do módulo de relatórios de pedidos, acessível apenas
 - `Decimal` para dinheiro; nunca `float`.
 - Escrita em `services.py`, leitura em `selectors.py`, views finas.
 - `comanda_number` **nunca** é chave única; o identificador é `Order.id`.
+- `OrderItem` é o **único** conceito de item do pedido; itens avulsos usam `item_type=MANUAL`, nunca um model novo nem produtos fictícios no catálogo (DA-20/DA-21).
 - Mobile-first, mínimo de cliques, linguagem simples (usuária final não técnica).
 
 **Objetivo:** qualquer desenvolvedor deve conseguir continuar exatamente do ponto onde o projeto parou, sem conhecimento prévio da conversa.
