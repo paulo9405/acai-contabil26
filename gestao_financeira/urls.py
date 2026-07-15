@@ -2,13 +2,22 @@
 URL configuration for gestao_financeira project.
 """
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect
 from django.urls import path, include
-from django.views.generic import RedirectView
+
+
+@login_required
+def home_redirect(request):
+    if request.user.is_superuser:
+        return redirect('dashboard')
+    return redirect('order-list')
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('finance.urls')),
     path('', include('orders.urls')),
-    path('', RedirectView.as_view(url='/dashboard/', permanent=False), name='home'),
+    path('', home_redirect, name='home'),
 ]

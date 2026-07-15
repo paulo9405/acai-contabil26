@@ -30,18 +30,18 @@ class TestDashboardView:
         response = api_client.get(url)
         assert response.status_code == 302  # Redirect to login
 
-    def test_dashboard_authenticated(self, authenticated_client):
+    def test_dashboard_authenticated(self, superuser_client):
         """Testa acesso ao dashboard autenticado."""
         url = reverse('dashboard')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
         assert response.status_code == 200
         assert 'today' in response.context
         assert 'month' in response.context
 
-    def test_dashboard_with_data(self, authenticated_client, multiple_closings, multiple_expenses):
+    def test_dashboard_with_data(self, superuser_client, multiple_closings, multiple_expenses):
         """Testa dashboard com dados."""
         url = reverse('dashboard')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'last_7_days' in response.context
@@ -62,30 +62,30 @@ class TestDailyClosingViews:
         response = api_client.get(url)
         assert response.status_code == 302
 
-    def test_closing_list_authenticated(self, authenticated_client):
+    def test_closing_list_authenticated(self, superuser_client):
         """Testa acesso à lista autenticado."""
         url = reverse('closing-list')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
         assert response.status_code == 200
 
-    def test_closing_list_with_data(self, authenticated_client, multiple_closings):
+    def test_closing_list_with_data(self, superuser_client, multiple_closings):
         """Testa lista com fechamentos."""
         url = reverse('closing-list')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'closings' in response.context
         assert len(response.context['closings']) == len(multiple_closings)
 
-    def test_closing_create_get(self, authenticated_client):
+    def test_closing_create_get(self, superuser_client):
         """Testa GET do formulário de criação."""
         url = reverse('closing-create')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'form' in response.context
 
-    def test_closing_create_post_valid(self, authenticated_client):
+    def test_closing_create_post_valid(self, superuser_client):
         """Testa POST com dados válidos."""
         url = reverse('closing-create')
         data = {
@@ -96,12 +96,12 @@ class TestDailyClosingViews:
             'card_sales': '300.00',
             'notes': 'Teste'
         }
-        response = authenticated_client.post(url, data)
+        response = superuser_client.post(url, data)
 
         assert response.status_code == 302  # Redirect
         assert DailyClosing.objects.filter(date=data['date']).exists()
 
-    def test_closing_create_post_invalid(self, authenticated_client):
+    def test_closing_create_post_invalid(self, superuser_client):
         """Testa POST com dados inválidos."""
         url = reverse('closing-create')
         data = {
@@ -111,21 +111,21 @@ class TestDailyClosingViews:
             'pix_sales': '200.00',
             'card_sales': '300.00'
         }
-        response = authenticated_client.post(url, data)
+        response = superuser_client.post(url, data)
 
         assert response.status_code == 200  # Permanece na página
         assert 'form' in response.context
         assert response.context['form'].errors
 
-    def test_closing_update_get(self, authenticated_client, daily_closing):
+    def test_closing_update_get(self, superuser_client, daily_closing):
         """Testa GET do formulário de edição."""
         url = reverse('closing-edit', kwargs={'pk': daily_closing.pk})
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'form' in response.context
 
-    def test_closing_update_post(self, authenticated_client, daily_closing):
+    def test_closing_update_post(self, superuser_client, daily_closing):
         """Testa POST de atualização."""
         url = reverse('closing-edit', kwargs={'pk': daily_closing.pk})
         data = {
@@ -136,7 +136,7 @@ class TestDailyClosingViews:
             'card_sales': '350.00',
             'notes': 'Atualizado'
         }
-        response = authenticated_client.post(url, data)
+        response = superuser_client.post(url, data)
 
         assert response.status_code == 302
         daily_closing.refresh_from_db()
@@ -145,7 +145,7 @@ class TestDailyClosingViews:
     def test_closing_delete_requires_superuser(self, authenticated_client, daily_closing):
         """Testa que exclusão requer superuser."""
         url = reverse('closing-delete', kwargs={'pk': daily_closing.pk})
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
         assert response.status_code == 403  # Forbidden
 
     def test_closing_delete_superuser(self, superuser_client, daily_closing):
@@ -173,16 +173,16 @@ class TestExpenseViews:
         response = api_client.get(url)
         assert response.status_code == 302
 
-    def test_expense_list_authenticated(self, authenticated_client):
+    def test_expense_list_authenticated(self, superuser_client):
         """Testa acesso à lista autenticado."""
         url = reverse('expense-list')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
         assert response.status_code == 200
 
-    def test_expense_list_with_filters(self, authenticated_client, expense):
+    def test_expense_list_with_filters(self, superuser_client, expense):
         """Testa lista com filtros."""
         url = reverse('expense-list')
-        response = authenticated_client.get(url, {
+        response = superuser_client.get(url, {
             'date_from': expense.date,
             'date_to': expense.date
         })
@@ -190,15 +190,15 @@ class TestExpenseViews:
         assert response.status_code == 200
         assert 'expenses' in response.context
 
-    def test_expense_create_get(self, authenticated_client):
+    def test_expense_create_get(self, superuser_client):
         """Testa GET do formulário de criação."""
         url = reverse('expense-create')
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'form' in response.context
 
-    def test_expense_create_post_valid(self, authenticated_client, expense_category):
+    def test_expense_create_post_valid(self, superuser_client, expense_category):
         """Testa POST com dados válidos."""
         url = reverse('expense-create')
         data = {
@@ -207,20 +207,20 @@ class TestExpenseViews:
             'amount': '75.50',
             'description': 'Teste'
         }
-        response = authenticated_client.post(url, data)
+        response = superuser_client.post(url, data)
 
         assert response.status_code == 302
         assert Expense.objects.filter(amount=Decimal('75.50')).exists()
 
-    def test_expense_update_get(self, authenticated_client, expense):
+    def test_expense_update_get(self, superuser_client, expense):
         """Testa GET do formulário de edição."""
         url = reverse('expense-edit', kwargs={'pk': expense.pk})
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
 
         assert response.status_code == 200
         assert 'form' in response.context
 
-    def test_expense_update_post(self, authenticated_client, expense):
+    def test_expense_update_post(self, superuser_client, expense):
         """Testa POST de atualização."""
         url = reverse('expense-edit', kwargs={'pk': expense.pk})
         data = {
@@ -229,7 +229,7 @@ class TestExpenseViews:
             'amount': '100.00',  # Alterado
             'description': 'Atualizado'
         }
-        response = authenticated_client.post(url, data)
+        response = superuser_client.post(url, data)
 
         assert response.status_code == 302
         expense.refresh_from_db()
@@ -238,7 +238,7 @@ class TestExpenseViews:
     def test_expense_delete_requires_superuser(self, authenticated_client, expense):
         """Testa que exclusão requer superuser."""
         url = reverse('expense-delete', kwargs={'pk': expense.pk})
-        response = authenticated_client.get(url)
+        response = superuser_client.get(url)
         assert response.status_code == 403
 
     def test_expense_delete_superuser(self, superuser_client, expense):
@@ -266,27 +266,27 @@ class TestReportView:
         response = api_client.get(url)
         assert response.status_code == 302
 
-    def test_report_authenticated(self, authenticated_client):
+    def test_report_authenticated(self, superuser_client):
         """Testa acesso ao relatório autenticado."""
         url = reverse('reports')
-        response = authenticated_client.get(url, {'period': 'this_month'})
+        response = superuser_client.get(url, {'period': 'this_month'})
         assert response.status_code == 200
 
-    def test_report_with_period(self, authenticated_client, multiple_closings):
+    def test_report_with_period(self, superuser_client, multiple_closings):
         """Testa relatório com período."""
         url = reverse('reports')
-        response = authenticated_client.get(url, {'period': 'last_7_days'})
+        response = superuser_client.get(url, {'period': 'last_7_days'})
 
         assert response.status_code == 200
         assert 'total_sales' in response.context
         assert 'total_expenses' in response.context
         assert 'total_profit' in response.context
 
-    def test_report_custom_period(self, authenticated_client):
+    def test_report_custom_period(self, superuser_client):
         """Testa relatório com período customizado."""
         today = timezone.now().date()
         url = reverse('reports')
-        response = authenticated_client.get(url, {
+        response = superuser_client.get(url, {
             'period': 'custom',
             'start_date': today - timedelta(days=7),
             'end_date': today

@@ -319,6 +319,7 @@
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
                         {% with url_name=request.resolver_match.url_name|default:'' %}
+                        {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if url_name == 'dashboard' %}active{% endif %}"
                                href="{% url 'dashboard' %}">
@@ -343,6 +344,7 @@
                                 <i class="bi bi-file-earmark-bar-graph"></i> {{ NAV_RELATORIOS }}
                             </a>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if url_name == 'order-list' or url_name == 'order-list-date' or url_name == 'order-create' or url_name == 'order-detail' or url_name == 'order-update' or url_name == 'order-cancel' or url_name == 'order-report' %}active{% endif %}"
                                href="{% url 'order-list' %}">

@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.exceptions import PermissionDenied
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView, RedirectView
 from django.db import models, transaction
 from django.db.models import Subquery, OuterRef, DecimalField
@@ -24,10 +25,25 @@ from finance.services import (
 
 
 # ============================================================================
+# MIXIN DE SUPERUSUÁRIO
+# ============================================================================
+
+class SuperuserRequiredMixin(LoginRequiredMixin):
+    """Bloqueia acesso a usuários que não são superusuários."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+
+# ============================================================================
 # DASHBOARD VIEW
 # ============================================================================
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(SuperuserRequiredMixin, TemplateView):
     """
     Dashboard principal do sistema.
     Exibe métricas do dia, do mês e últimos 7 dias.
@@ -120,7 +136,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 # REPORT VIEW
 # ============================================================================
 
-class ReportView(LoginRequiredMixin, TemplateView):
+class ReportView(SuperuserRequiredMixin, TemplateView):
     """
     Relatórios financeiros com filtros por período.
     Exibe resumo de vendas, despesas, lucro e listagem detalhada.
@@ -270,7 +286,7 @@ class ReportView(LoginRequiredMixin, TemplateView):
 # EXPENSE VIEWS
 # ============================================================================
 
-class ExpenseListView(LoginRequiredMixin, ListView):
+class ExpenseListView(SuperuserRequiredMixin, ListView):
     """
     Lista todas as despesas com filtros e paginação.
     """
@@ -317,7 +333,7 @@ class ExpenseListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ExpenseCreateView(LoginRequiredMixin, CreateView):
+class ExpenseCreateView(SuperuserRequiredMixin, CreateView):
     """
     Cria uma nova despesa.
     """
@@ -359,7 +375,7 @@ class ExpenseCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class ExpenseUpdateView(LoginRequiredMixin, UpdateView):
+class ExpenseUpdateView(SuperuserRequiredMixin, UpdateView):
     """
     Edita uma despesa existente.
     """
@@ -402,7 +418,7 @@ class ExpenseUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
 
-class ExpenseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class ExpenseDeleteView(SuperuserRequiredMixin, UserPassesTestMixin, DeleteView):
     """
     Exclui uma despesa.
     Apenas superusuários podem excluir.
@@ -438,7 +454,7 @@ class ExpenseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # DAILY CLOSING VIEWS
 # ============================================================================
 
-class DailyClosingListView(LoginRequiredMixin, ListView):
+class DailyClosingListView(SuperuserRequiredMixin, ListView):
     """
     Lista todos os fechamentos diários com paginação.
     """
@@ -479,7 +495,7 @@ class DailyClosingListView(LoginRequiredMixin, ListView):
         return context
 
 
-class DailyClosingCreateView(LoginRequiredMixin, CreateView):
+class DailyClosingCreateView(SuperuserRequiredMixin, CreateView):
     """
     Cria um novo fechamento diário.
     """
@@ -523,7 +539,7 @@ class DailyClosingCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class DailyClosingUpdateView(LoginRequiredMixin, UpdateView):
+class DailyClosingUpdateView(SuperuserRequiredMixin, UpdateView):
     """
     Edita um fechamento diário existente.
     """
@@ -567,7 +583,7 @@ class DailyClosingUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
 
-class DailyClosingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class DailyClosingDeleteView(SuperuserRequiredMixin, UserPassesTestMixin, DeleteView):
     """
     Exclui um fechamento diário.
     Apenas superusuários podem excluir.
@@ -601,7 +617,7 @@ class DailyClosingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView
 # FECHAMENTO DO DIA — TELA UNIFICADA (nova arquitetura)
 # ============================================================================
 
-class DailyClosingTodayRedirectView(LoginRequiredMixin, RedirectView):
+class DailyClosingTodayRedirectView(SuperuserRequiredMixin, RedirectView):
     """
     Redireciona /fechamento/ para a data de hoje.
     Permite que o menu sempre aponte para um link fixo.
@@ -611,7 +627,7 @@ class DailyClosingTodayRedirectView(LoginRequiredMixin, RedirectView):
         return reverse('daily-closing', kwargs={'closing_date': today.isoformat()})
 
 
-class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
+class DailyClosingUnifiedView(SuperuserRequiredMixin, TemplateView):
     """
     Tela unificada de Fechamento do Dia.
 
