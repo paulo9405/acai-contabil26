@@ -515,7 +515,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 1 — Catálogo
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Criar os modelos de catálogo administráveis (`ProductCategory`, `Size`, `Product`, `ProductVariant`, `Addon`), com admin configurado e migrações.
 
@@ -534,18 +534,18 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fase 0 completa. Todas as pendências (P-01 a P-12) resolvidas.
 
 **Checklist técnico:**
-- [ ] Criar estrutura do app `orders`
-- [ ] Implementar `ProductCategory` com `kind` choices
-- [ ] Implementar `Size` com `volume_ml`
-- [ ] Implementar `Product` com `product_type` choices
-- [ ] Implementar `ProductVariant` com `included_addons_limit` e constraint `(product, size)`
-- [ ] Implementar `Addon` com `is_free_option`
-- [ ] Configurar `verbose_name`, `ordering` e `indexes` em todos os models
-- [ ] `clean()` em `ProductVariant` para unicidade com `size=NULL`
-- [ ] Registrar todos os models no `admin.py` com fieldsets formatados
-- [ ] Gerar migração `0001_initial`
-- [ ] Registrar app em `INSTALLED_APPS`
-- [ ] Rodar `migrate` sem erros
+- [x] Criar estrutura do app `orders`
+- [x] Implementar `ProductCategory` com `kind` choices
+- [x] Implementar `Size` com `volume_ml`
+- [x] Implementar `Product` com `product_type` choices
+- [x] Implementar `ProductVariant` com `included_addons_limit` e constraint `(product, size)`
+- [x] Implementar `Addon` com `is_free_option`
+- [x] Configurar `verbose_name`, `ordering` e `indexes` em todos os models
+- [x] `clean()` em `ProductVariant` para unicidade com `size=NULL`
+- [x] Registrar todos os models no `admin.py` com fieldsets formatados
+- [x] Gerar migração `0001_initial`
+- [x] Registrar app em `INSTALLED_APPS`
+- [x] Rodar `migrate` sem erros
 
 **Testes esperados:**
 - Criação de categoria, produto, variação e adicional
@@ -554,15 +554,15 @@ Order.total = sum(line_total de todos os OrderItems)
 - `__str__` de cada model
 
 **Critérios de aceite:**
-- [ ] Cadastrar todo o cardápio pelo Django Admin sem tocar código
-- [ ] Admin sem erros de runtime
-- [ ] Testes passando com cobertura ≥ 80%
-- [ ] `migrate` sem conflitos em SQLite e Postgres
+- [x] Cadastrar todo o cardápio pelo Django Admin sem tocar código
+- [x] Admin sem erros de runtime
+- [x] Testes passando com cobertura ≥ 80%
+- [x] `migrate` sem conflitos em SQLite e Postgres
 
 ---
 
 ### Fase 2 — Carga Inicial do Cardápio
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Popular o catálogo com o cardápio real da Açaí da Rose.
 
@@ -577,15 +577,15 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fase 1 completa.
 
 **Checklist técnico:**
-- [ ] Criar management command `load_catalog`
-- [ ] Implementar carga de `Size` (6 tamanhos + volume_ml)
-- [ ] Implementar carga de `ProductCategory` (Monte seu Açaí, Açaís Prontos, Adicionais, Sorvetes, Vitaminas)
-- [ ] Implementar carga de `Addon` com preços e `is_free_option`
-- [ ] Implementar carga de `Product` por categoria
-- [ ] Implementar carga de `ProductVariant` com preços (conferir com cardápio)
-- [ ] Implementar carga de `ProductVariant` para "Monte seu Açaí" com `included_addons_limit`
-- [ ] Garantir idempotência: executar 2× não duplica registros
-- [ ] Execução **manual** apenas (P-09) — não adicionar ao `build.sh`/deploy
+- [x] Criar management command `load_catalog`
+- [x] Implementar carga de `Size` (6 tamanhos + volume_ml)
+- [x] Implementar carga de `ProductCategory` (Monte seu Açaí, Açaís Prontos, Adicionais, Sorvetes, Vitaminas)
+- [x] Implementar carga de `Addon` com preços e `is_free_option`
+- [x] Implementar carga de `Product` por categoria
+- [x] Implementar carga de `ProductVariant` com preços (conferir com cardápio)
+- [x] Implementar carga de `ProductVariant` para "Monte seu Açaí" com `included_addons_limit`
+- [x] Garantir idempotência: executar 2× não duplica registros
+- [x] Execução **manual** apenas (P-09) — não adicionar ao `build.sh`/deploy
 
 **Testes esperados:**
 - Rodar command 2× sem duplicação
@@ -594,14 +594,14 @@ Order.total = sum(line_total de todos os OrderItems)
 - `included_addons_limit` de "Monte seu Açaí 500ml" = 3
 
 **Critérios de aceite:**
-- [ ] Cardápio completo disponível no Admin
-- [ ] Nenhum produto duplicado após reexecução
-- [ ] Pelo menos 1 produto de cada categoria carregado
+- [x] Cardápio completo disponível no Admin
+- [x] Nenhum produto duplicado após reexecução
+- [x] Pelo menos 1 produto de cada categoria carregado
 
 ---
 
 ### Fase 3 — Pedidos e Itens
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Implementar `Order`, `OrderItem`, `OrderItemAddon`, services de criação/atualização/cancelamento com cálculo correto de totais em `transaction.atomic`.
 
@@ -619,18 +619,18 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fase 1. (Pendências todas resolvidas.)
 
 **Checklist técnico:**
-- [ ] Implementar `Order` com todos os campos e choices (`PIX`/`CASH`/`CARD`) — **sem constraint de unicidade de comanda**
-- [ ] Implementar `OrderItem` com snapshots e cálculo de `line_total` (suporta múltiplos itens por pedido)
-- [ ] Implementar `OrderItemAddon` com `is_included` e `line_total` (`quantity` sempre 1 na v1)
-- [ ] Implementar `Order.total` calculado e salvo (não property pura — precisa persistir)
-- [ ] Implementar `create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by)` com `transaction.atomic`
-- [ ] Implementar `cancel_order(*, order, cancelled_by, reason)` com auditoria — **`reason` obrigatório**
-- [ ] Implementar `update_order(...)` com regra de janela (bloqueada para `Operacao` se já existe `DailyClosing` do dia — DA-17)
-- [ ] Validar limite de adicionais incluídos no service; **excedente vira pago automaticamente** (DA-19), sem bloquear
-- [ ] Validar `informed_total` vs `total` (divergência gera aviso, não erro)
-- [ ] Implementar `get_orders_by_date(date)` em `selectors.py`
-- [ ] Gerar migração
-- [ ] Adicionar factories ao `conftest.py`
+- [x] Implementar `Order` com todos os campos e choices (`PIX`/`CASH`/`CARD`) — **sem constraint de unicidade de comanda**
+- [x] Implementar `OrderItem` com snapshots e cálculo de `line_total` (suporta múltiplos itens por pedido)
+- [x] Implementar `OrderItemAddon` com `is_included` e `line_total` (`quantity` sempre 1 na v1)
+- [x] Implementar `Order.total` calculado e salvo (não property pura — precisa persistir)
+- [x] Implementar `create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by)` com `transaction.atomic`
+- [x] Implementar `cancel_order(*, order, cancelled_by, reason)` com auditoria — **`reason` obrigatório**
+- [x] Implementar `update_order(...)` com regra de janela (bloqueada para `Operacao` se já existe `DailyClosing` do dia — DA-17)
+- [x] Validar limite de adicionais incluídos no service; **excedente vira pago automaticamente** (DA-19), sem bloquear
+- [x] Validar `informed_total` vs `total` (divergência gera aviso, não erro)
+- [x] Implementar `get_orders_by_date(date)` em `selectors.py`
+- [x] Gerar migração
+- [x] Adicionar factories ao `conftest.py`
 
 **Testes esperados:**
 - Criar pedido com múltiplos itens (ex.: Açaí Monte 300ml + Açaí Nutella 500ml + 2 Coca-Cola)
@@ -645,10 +645,10 @@ Order.total = sum(line_total de todos os OrderItems)
 - Validação de `payment_method` (apenas `PIX`/`CASH`/`CARD`)
 
 **Critérios de aceite:**
-- [ ] Criar pedido completo via shell/testes com totais corretos
-- [ ] Preço histórico isolado de mudanças no catálogo
-- [ ] Nenhuma constraint de unicidade sobre `comanda_number`
-- [ ] Cobertura ≥ 80%
+- [x] Criar pedido completo via shell/testes com totais corretos
+- [x] Preço histórico isolado de mudanças no catálogo
+- [x] Nenhuma constraint de unicidade sobre `comanda_number`
+- [x] Cobertura ≥ 80%
 
 ---
 
@@ -912,6 +912,88 @@ Revisão final do roadmap antes de iniciar a Fase 1. Todas as pendências (P-01 
 **Testes executados:** nenhum.
 
 **Pendências encontradas:** nenhuma. Projeto liberado para iniciar a Fase 1.
+
+---
+
+### Fase 1 — Catálogo
+**Data:** 2026-07-15
+**Fase:** 1 — Catálogo
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Criação do app `orders` com todos os modelos de catálogo: `ProductCategory`, `Size`, `Product`, `ProductVariant`, `Addon`. Admin configurado com fieldsets e exibições formatadas. Migration `0001_initial` gerada e aplicada sem erros.
+
+**Arquivos criados:**
+- `orders/__init__.py`
+- `orders/apps.py`
+- `orders/models.py`
+- `orders/admin.py`
+- `orders/selectors.py` (stub)
+- `orders/services.py` (stub)
+- `orders/migrations/0001_initial.py`
+- `tests/test_orders_models.py` (33 testes)
+
+**Arquivos modificados:**
+- `gestao_financeira/settings.py` — `'orders'` adicionado a `INSTALLED_APPS`
+- `pytest.ini` — `--cov=orders` adicionado
+- `tests/conftest.py` — factories e fixtures para os 5 novos models
+
+**Migrações criadas:** `orders/migrations/0001_initial.py`
+
+**Testes executados:** 121 passando, cobertura total 80.06%.
+
+**Decisões registradas:**
+- `UniqueConstraint` com `condition=Q(size__isnull=False)` (índice parcial) + `clean()` para `size=NULL` — mais explícito e seguro cross-DB do que constraint sem condição.
+
+**Pendências encontradas:** nenhuma. Fase 2 pode iniciar.
+
+---
+
+### Fase 2 — Carga Inicial do Cardápio
+**Data:** 2026-07-15
+**Fase:** 2 — Carga Inicial do Cardápio
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Management command `load_catalog` criado com cardápio completo da Açaí da Rose. Idempotente via `get_or_create`. Suporta `--dry-run`. Resultado: 5 categorias, 6 tamanhos, 24 produtos, 88 variações, 27 adicionais (150 registros no total).
+
+**Arquivos criados:**
+- `orders/management/__init__.py`
+- `orders/management/commands/__init__.py`
+- `orders/management/commands/load_catalog.py`
+- `tests/test_orders_load_catalog.py` (20 testes)
+
+**Migrações criadas:** nenhuma.
+
+**Testes executados:** 141 passando, cobertura total 80.06%.
+
+**Pendências encontradas:** nenhuma. Fase 3 pode iniciar.
+
+---
+
+### Fase 3 — Pedidos e Itens
+**Data:** 2026-07-15
+**Fase:** 3 — Pedidos e Itens
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Implementação completa de `Order`, `OrderItem`, `OrderItemAddon` com todos os campos, choices e snapshots históricos. Services `create_order`, `cancel_order`, `update_order` e selectors `get_orders_by_date`, `get_order_detail`. Migration `0002_orders_and_items` gerada e aplicada.
+
+**Arquivos modificados/criados:**
+- `orders/models.py` — adicionados `Order`, `OrderItem`, `OrderItemAddon`
+- `orders/services.py` — implementado completamente
+- `orders/selectors.py` — implementado completamente
+- `orders/migrations/0002_orders_and_items.py`
+- `tests/conftest.py` — `OrderFactory`, `OrderItemFactory`, `OrderItemAddonFactory`, fixture `order`
+- `tests/test_orders_services.py` — 38 testes
+
+**Migrações criadas:** `orders/migrations/0002_orders_and_items.py`
+
+**Testes executados:** 179 passando, cobertura total 83.01%.
+
+**Decisões registradas:** nenhuma nova — todas já cobertas por DA-01 a DA-19.
+
+**Pendências encontradas:** nenhuma. Fase 4 pode iniciar.
 
 ---
 

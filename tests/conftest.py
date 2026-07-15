@@ -11,6 +11,7 @@ import factory
 from factory.django import DjangoModelFactory
 
 from finance.models import ExpenseCategory, DailyClosing, Expense
+from orders.models import ProductCategory, Size, Product, ProductVariant, Addon, Order, OrderItem, OrderItemAddon
 
 
 # ============================================================================
@@ -67,6 +68,112 @@ class ExpenseFactory(DjangoModelFactory):
     category = factory.SubFactory(ExpenseCategoryFactory)
     amount = factory.Faker('pydecimal', left_digits=3, right_digits=2, positive=True)
     description = factory.Faker('sentence')
+
+
+class ProductCategoryFactory(DjangoModelFactory):
+    """Factory para criar categorias de produto."""
+    class Meta:
+        model = ProductCategory
+
+    name = factory.Sequence(lambda n: f'Categoria {n}')
+    kind = ProductCategory.Kind.STANDARD
+    sort_order = factory.Sequence(lambda n: n)
+    active = True
+
+
+class SizeFactory(DjangoModelFactory):
+    """Factory para criar tamanhos."""
+    class Meta:
+        model = Size
+
+    name = factory.Sequence(lambda n: f'{(n + 1) * 300} ml')
+    volume_ml = factory.Sequence(lambda n: (n + 1) * 300)
+    sort_order = factory.Sequence(lambda n: n)
+    active = True
+
+
+class ProductFactory(DjangoModelFactory):
+    """Factory para criar produtos."""
+    class Meta:
+        model = Product
+
+    category = factory.SubFactory(ProductCategoryFactory)
+    name = factory.Sequence(lambda n: f'Produto {n}')
+    description = ''
+    product_type = Product.ProductType.STANDARD
+    sort_order = factory.Sequence(lambda n: n)
+    active = True
+
+
+class ProductVariantFactory(DjangoModelFactory):
+    """Factory para criar variações de produto."""
+    class Meta:
+        model = ProductVariant
+
+    product = factory.SubFactory(ProductFactory)
+    size = factory.SubFactory(SizeFactory)
+    price = Decimal('18.00')
+    included_addons_limit = 0
+    active = True
+
+
+class AddonFactory(DjangoModelFactory):
+    """Factory para criar adicionais."""
+    class Meta:
+        model = Addon
+
+    name = factory.Sequence(lambda n: f'Adicional {n}')
+    price = Decimal('3.00')
+    is_free_option = False
+    sort_order = factory.Sequence(lambda n: n)
+    active = True
+
+
+class OrderFactory(DjangoModelFactory):
+    """Factory para criar pedidos."""
+    class Meta:
+        model = Order
+
+    comanda_number = factory.Sequence(lambda n: str(n + 1))
+    order_date = factory.LazyFunction(lambda: timezone.now().date())
+    order_time = factory.LazyFunction(lambda: timezone.now().time().replace(second=0, microsecond=0))
+    payment_method = Order.PaymentMethod.PIX
+    total = Decimal('18.00')
+    informed_total = None
+    status = Order.Status.ACTIVE
+    notes = ''
+    created_by = factory.SubFactory(UserFactory)
+
+
+class OrderItemFactory(DjangoModelFactory):
+    """Factory para criar itens de pedido."""
+    class Meta:
+        model = OrderItem
+
+    order = factory.SubFactory(OrderFactory)
+    product = factory.SubFactory(ProductFactory)
+    variant = factory.SubFactory(ProductVariantFactory)
+    quantity = 1
+    product_name = 'Produto Teste'
+    variant_name = '300 ml'
+    size_name = '300 ml'
+    unit_price = Decimal('18.00')
+    addons_total = Decimal('0.00')
+    line_total = Decimal('18.00')
+
+
+class OrderItemAddonFactory(DjangoModelFactory):
+    """Factory para criar adicionais de item de pedido."""
+    class Meta:
+        model = OrderItemAddon
+
+    order_item = factory.SubFactory(OrderItemFactory)
+    addon = factory.SubFactory(AddonFactory)
+    name = 'Adicional Teste'
+    unit_price = Decimal('3.00')
+    quantity = 1
+    is_included = False
+    line_total = Decimal('3.00')
 
 
 # ============================================================================
@@ -141,6 +248,42 @@ def multiple_expenses(db, expense_category):
         )
         expenses.append(expense)
     return expenses
+
+
+@pytest.fixture
+def product_category(db):
+    """Cria uma categoria de produto padrão."""
+    return ProductCategoryFactory()
+
+
+@pytest.fixture
+def size(db):
+    """Cria um tamanho padrão (300 ml)."""
+    return SizeFactory(name='300 ml', volume_ml=300, sort_order=0)
+
+
+@pytest.fixture
+def product(db, product_category):
+    """Cria um produto padrão."""
+    return ProductFactory(category=product_category)
+
+
+@pytest.fixture
+def product_variant(db, product, size):
+    """Cria uma variação de produto padrão."""
+    return ProductVariantFactory(product=product, size=size)
+
+
+@pytest.fixture
+def addon(db):
+    """Cria um adicional padrão."""
+    return AddonFactory()
+
+
+@pytest.fixture
+def order(db, user):
+    """Cria um pedido ativo."""
+    return OrderFactory(created_by=user)
 
 
 @pytest.fixture
