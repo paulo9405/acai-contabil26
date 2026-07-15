@@ -788,7 +788,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 7 — Relatórios
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Relatórios operacionais de produtos, adicionais, horários e faturamento por produto.
 
@@ -813,12 +813,12 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fase 3+ (dados suficientes).
 
 **Checklist técnico:**
-- [ ] Implementar selectors de agregação com índices existentes
-- [ ] Gráficos com Chart.js (padrão `dashboard.html`)
-- [ ] Filtro de período (reutilizar padrão de `ReportFilterForm`)
-- [ ] Relatório de litros com `volume_ml`
-- [ ] Relatório de horário de pico com agrupamento por hora
-- [ ] Relatório de divergências
+- [x] Implementar selectors de agregação com índices existentes
+- [x] Gráficos com Chart.js (padrão `dashboard.html`)
+- [x] Filtro de período (reutilizar padrão de `ReportFilterForm`)
+- [x] Relatório de litros com `volume_ml`
+- [x] Relatório de horário de pico com agrupamento por hora
+- [x] Relatório de divergências
 
 **Testes esperados:**
 - Cada agregação testada com dataset de fixture
@@ -826,9 +826,9 @@ Order.total = sum(line_total de todos os OrderItems)
 - Horário de pico identifica hora com mais pedidos
 
 **Critérios de aceite:**
-- [ ] Relatórios exibem dados coerentes com os pedidos lançados
-- [ ] Filtro por período funciona
-- [ ] Cobertura ≥ 80%
+- [x] Relatórios exibem dados coerentes com os pedidos lançados
+- [x] Filtro por período funciona
+- [x] Cobertura ≥ 80%
 
 ---
 
@@ -1088,6 +1088,35 @@ Campo `DailyClosing.source` (`MANUAL`/`ORDERS`) adicionado ao modelo. Função `
 **Decisão registrada:** `recalculate_closing_from_orders` só cria/atualiza um fechamento `ORDERS`; nunca toca fechamentos `MANUAL`. A chamada automática é restrita a `order_date == today` para não interferir em histórico.
 
 **Pendências encontradas:** Validar agregações no Postgres do Render após deploy. Fase 7 pode iniciar.
+
+---
+
+### Fase 7 — Relatórios
+**Data:** 2026-07-15
+**Fase:** 7 — Relatórios
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Implementação completa do módulo de relatórios de pedidos, acessível apenas a `is_superuser`. Filtro de período reutilizando `ReportFilterForm` de `finance/forms.py` (DA-16). Nove selectors de agregação adicionados a `orders/selectors.py`: resumo do período, vendas por forma de pagamento, top produtos, top tamanhos, litros vendidos (via `variant__size__volume_ml`), top adicionais, horários de pico, divergências e totais diários. Template mobile-first com gráficos Chart.js (donut de pagamentos, linha de faturamento diário, barras de horário de pico). Botão "Relatórios" visível apenas para superusuários na listagem.
+
+**Arquivos criados:**
+- `templates/orders/order_report.html`
+- `tests/test_orders_phase7.py` — 27 testes
+
+**Arquivos modificados:**
+- `orders/selectors.py` — 9 novas funções de agregação
+- `orders/views.py` — `OrderReportView` + helper `_calculate_period_dates`
+- `orders/urls.py` — rota `pedidos/relatorios/` (inserida antes de `<str:order_date>/`)
+- `templates/base.html` — `order-report` adicionado ao active check do nav
+- `templates/orders/order_list.html` — botão "Relatórios" para superusuários
+
+**Migrações criadas:** nenhuma.
+
+**Testes executados:** 272 passando, cobertura total 87.71%. `orders/selectors.py` com 100% de cobertura.
+
+**Decisões registradas:** nenhuma nova — todas cobertas por DA-01 a DA-19.
+
+**Pendências encontradas:** nenhuma. Fase 8 pode iniciar (testes, documentação e implantação).
 
 ---
 

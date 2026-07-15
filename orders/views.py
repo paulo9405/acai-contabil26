@@ -7,14 +7,52 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
+from django.utils import timezone
+
+from finance.forms import ReportFilterForm
 from finance.models import DailyClosing
 from orders.models import Order, ProductVariant, Addon
-from orders.selectors import get_catalog_json, get_orders_by_date_with_items, get_order_detail
+from orders.selectors import (
+    get_catalog_json,
+    get_daily_order_totals,
+    get_divergences,
+    get_liters_sold,
+    get_order_detail,
+    get_orders_by_date_with_items,
+    get_orders_summary,
+    get_peak_hours,
+    get_sales_by_payment_method,
+    get_top_addons,
+    get_top_products,
+    get_top_sizes,
+)
 from orders.services import create_order, update_order, cancel_order
 
 
 def _has_order_permission(user):
     return user.is_superuser or user.groups.filter(name='Operacao').exists()
+
+
+def _calculate_period_dates(period, custom_start, custom_end):
+    today = timezone.now().date()
+    if period == 'today':
+        return today, today
+    elif period == 'yesterday':
+        yesterday = today - timedelta(1)
+        return yesterday, yesterday
+    elif period == 'last_7_days':
+        return today - timedelta(6), today
+    elif period == 'last_30_days':
+        return today - timedelta(29), today
+    elif period == 'this_month':
+        return today.replace(day=1), today
+    elif period == 'last_month':
+        first_this = today.replace(day=1)
+        last_prev = first_this - timedelta(1)
+        return last_prev.replace(day=1), last_prev
+    elif period == 'custom':
+        return custom_start, custom_end
+    return today.replace(day=1), today
 
 
 class OrderCreateView(LoginRequiredMixin, View):
@@ -344,3 +382,54 @@ class OrderCancelView(LoginRequiredMixin, View):
         except ValueError as exc:
             messages.error(request, str(exc))
             return render(request, self.template_name, {'order': order})
+
+
+# ---------------------------------------------------------------------------
+# OrderReportView
+# ---------------------------------------------------------------------------
+
+_PAYMENT_LABELS = {
+    Order.PaymentMethod.PIX: 'Pix',
+    Order.PaymentMethod.CASH: 'Dinheiro',
+    Order.PaymentMethod.CARD: 'Cartão',
+}
+
+
+class OrderReportView(LoginRequiredMixin, View):
+    template_name = 'orders/order_report.html'
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+
+        form = ReportFilterForm(request.GET or {'period': 'this_month'})
+        context = {'form': form}
+
+        if form.is_valid():
+            start_date, end_date = _calculate_period_dates(
+                form.cleaned_data['period'],
+                form.cleaned_data.get('start_date'),
+                form.cleaned_data.get('end_date'),
+            )
+            context['start_date'] = start_date
+            context['end_date'] = end_date
+            context['period_label'] = dict(form.fields['period'].choices)[form.cleaned_data['period']]
+
+            summary = get_orders_summary(start_date=start_date, end_date=end_date)
+            context.update(summary)
+            context['liters_sold'] = get_liters_sold(start_date=start_date, end_date=end_date)
+
+            raw_payment = get_sales_by_payment_method(start_date=start_date, end_date=end_date)
+            context['sales_by_payment'] = [
+                {**row, 'label': _PAYMENT_LABELS.get(row['payment_method'], row['payment_method'])}
+                for row in raw_payment
+            ]
+
+            context['top_products'] = get_top_products(start_date=start_date, end_date=end_date)
+            context['top_sizes'] = get_top_sizes(start_date=start_date, end_date=end_date)
+            context['top_addons'] = get_top_addons(start_date=start_date, end_date=end_date)
+            context['peak_hours'] = get_peak_hours(start_date=start_date, end_date=end_date)
+            context['divergences'] = get_divergences(start_date=start_date, end_date=end_date)
+            context['daily_totals'] = get_daily_order_totals(start_date=start_date, end_date=end_date)
+
+        return render(request, self.template_name, context)

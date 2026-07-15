@@ -5,10 +5,12 @@ from orders.views import (
     OrderDetailView,
     OrderUpdateView,
     OrderCancelView,
+    OrderReportView,
 )
 
 urlpatterns = [
     path('pedidos/novo/', OrderCreateView.as_view(), name='order-create'),
+    path('pedidos/relatorios/', OrderReportView.as_view(), name='order-report'),
     path('pedidos/', OrderListView.as_view(), name='order-list'),
     path('pedidos/<str:order_date>/', OrderListView.as_view(), name='order-list-date'),
     path('pedidos/<int:pk>/detalhe/', OrderDetailView.as_view(), name='order-detail'),

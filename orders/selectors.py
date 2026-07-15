@@ -2,7 +2,12 @@
 Selectors for the orders app — read-only queries.
 """
 
-from orders.models import Order, ProductCategory, Addon
+from decimal import Decimal
+
+from django.db.models import Count, ExpressionWrapper, F, IntegerField, Sum
+from django.db.models.functions import ExtractHour
+
+from orders.models import Addon, Order, OrderItem, OrderItemAddon, ProductCategory
 
 
 def get_orders_by_date(*, date):
@@ -40,6 +45,138 @@ def get_orders_by_date_with_items(*, date):
         .select_related('created_by', 'cancelled_by')
         .prefetch_related('items')
         .order_by('order_time', 'comanda_number')
+    )
+
+
+def _active_orders_qs(start_date, end_date):
+    return Order.objects.filter(
+        status=Order.Status.ACTIVE,
+        order_date__gte=start_date,
+        order_date__lte=end_date,
+    )
+
+
+def get_orders_summary(*, start_date, end_date):
+    agg = _active_orders_qs(start_date, end_date).aggregate(
+        total_orders=Count('id'),
+        total_revenue=Sum('total'),
+    )
+    total_orders = agg['total_orders'] or 0
+    total_revenue = agg['total_revenue'] or Decimal('0')
+    avg_ticket = (total_revenue / total_orders) if total_orders > 0 else Decimal('0')
+    return {
+        'total_orders': total_orders,
+        'total_revenue': total_revenue,
+        'average_ticket': avg_ticket,
+    }
+
+
+def get_sales_by_payment_method(*, start_date, end_date):
+    return list(
+        _active_orders_qs(start_date, end_date)
+        .values('payment_method')
+        .annotate(total=Sum('total'), count=Count('id'))
+        .order_by('-total')
+    )
+
+
+def get_top_products(*, start_date, end_date, limit=10):
+    return list(
+        OrderItem.objects
+        .filter(
+            order__status=Order.Status.ACTIVE,
+            order__order_date__gte=start_date,
+            order__order_date__lte=end_date,
+        )
+        .values('product_name')
+        .annotate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum('line_total'),
+        )
+        .order_by('-total_quantity')[:limit]
+    )
+
+
+def get_top_sizes(*, start_date, end_date, limit=10):
+    return list(
+        OrderItem.objects
+        .filter(
+            order__status=Order.Status.ACTIVE,
+            order__order_date__gte=start_date,
+            order__order_date__lte=end_date,
+            size_name__gt='',
+        )
+        .values('size_name')
+        .annotate(total_quantity=Sum('quantity'))
+        .order_by('-total_quantity')[:limit]
+    )
+
+
+def get_liters_sold(*, start_date, end_date):
+    result = (
+        OrderItem.objects
+        .filter(
+            order__status=Order.Status.ACTIVE,
+            order__order_date__gte=start_date,
+            order__order_date__lte=end_date,
+            variant__isnull=False,
+            variant__size__isnull=False,
+        )
+        .annotate(
+            item_ml=ExpressionWrapper(
+                F('variant__size__volume_ml') * F('quantity'),
+                output_field=IntegerField(),
+            )
+        )
+        .aggregate(total_ml=Sum('item_ml'))
+    )
+    total_ml = result['total_ml'] or 0
+    return Decimal(str(total_ml)) / Decimal('1000')
+
+
+def get_top_addons(*, start_date, end_date, limit=10):
+    return list(
+        OrderItemAddon.objects
+        .filter(
+            order_item__order__status=Order.Status.ACTIVE,
+            order_item__order__order_date__gte=start_date,
+            order_item__order__order_date__lte=end_date,
+        )
+        .values('name')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:limit]
+    )
+
+
+def get_peak_hours(*, start_date, end_date):
+    return list(
+        _active_orders_qs(start_date, end_date)
+        .annotate(hour=ExtractHour('order_time'))
+        .values('hour')
+        .annotate(count=Count('id'))
+        .order_by('hour')
+    )
+
+
+def get_divergences(*, start_date, end_date):
+    return (
+        _active_orders_qs(start_date, end_date)
+        .filter(informed_total__isnull=False)
+        .exclude(informed_total=F('total'))
+        .select_related('created_by')
+        .order_by('order_date', 'order_time')
+    )
+
+
+def get_daily_order_totals(*, start_date, end_date):
+    return list(
+        _active_orders_qs(start_date, end_date)
+        .values('order_date')
+        .annotate(
+            total_revenue=Sum('total'),
+            order_count=Count('id'),
+        )
+        .order_by('order_date')
     )
 
 

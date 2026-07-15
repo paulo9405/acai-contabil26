@@ -1,0 +1,468 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}Relatório de Pedidos{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="h4 mb-0"><i class="bi bi-bar-chart-line"></i> Relatório de Pedidos</h1>
+                <a href="{% url 'order-list' %}" class="btn btn-sm btn-outline-secondary ms-auto">
+                    <i class="bi bi-arrow-left"></i> Pedidos do Dia
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtro de período -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{% url 'order-report' %}">
+                <div class="row g-3">
+                    <div class="col-12">
+                        {{ form.period.label_tag }}
+                        {{ form.period }}
+                    </div>
+                    <div class="col-12 col-md-6" id="custom-dates" style="display:none">
+                        {{ form.start_date.label_tag }}
+                        {{ form.start_date }}
+                    </div>
+                    <div class="col-12 col-md-6" id="custom-dates-end" style="display:none">
+                        {{ form.end_date.label_tag }}
+                        {{ form.end_date }}
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-search"></i> Gerar Relatório
+                        </button>
+                    </div>
+                </div>
+                {% if form.errors %}
+                <div class="alert alert-danger mt-3">
+                    {{ form.non_field_errors }}
+                    {% for field in form %}{{ field.errors }}{% endfor %}
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if start_date and end_date %}
+
+    <!-- Período selecionado -->
+    <div class="alert alert-info mb-4">
+        <strong><i class="bi bi-calendar-range"></i> Período:</strong>
+        {{ start_date|date:"d/m/Y" }} até {{ end_date|date:"d/m/Y" }}
+        {% if period_label %}({{ period_label }}){% endif %}
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- RESUMO                                                            -->
+    <!-- ================================================================ -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pedidos</small>
+                    <h3 class="mb-0">{{ total_orders }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-success h-100">
+                <div class="card-body">
+                    <small class="text-muted d-block">Faturamento</small>
+                    <h3 class="mb-0 text-success">R$ {{ total_revenue|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <small class="text-muted d-block">Ticket Médio</small>
+                    <h3 class="mb-0">R$ {{ average_ticket|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-primary h-100">
+                <div class="card-body">
+                    <small class="text-muted d-block">Litros Vendidos</small>
+                    <h3 class="mb-0 text-primary">{{ liters_sold|floatformat:1 }} L</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if total_orders == 0 %}
+    <div class="alert alert-warning">
+        <i class="bi bi-info-circle"></i> Nenhum pedido ativo encontrado para o período selecionado.
+    </div>
+    {% else %}
+
+    <!-- ================================================================ -->
+    <!-- VENDAS POR FORMA DE PAGAMENTO                                     -->
+    <!-- ================================================================ -->
+    {% if sales_by_payment %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-credit-card"></i> Vendas por Forma de Pagamento</h5>
+        </div>
+        <div class="card-body">
+            <div class="row align-items-center g-3">
+                <div class="col-12 col-md-4">
+                    <div style="height:200px">
+                        <canvas id="paymentChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-12 col-md-8">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Pagamento</th>
+                                    <th class="text-end">Pedidos</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end">%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in sales_by_payment %}
+                                <tr>
+                                    <td>{{ row.label }}</td>
+                                    <td class="text-end">{{ row.count }}</td>
+                                    <td class="text-end fw-bold text-success">R$ {{ row.total|floatformat:2 }}</td>
+                                    <td class="text-end">
+                                        {% if total_revenue %}
+                                        {% widthratio row.total total_revenue 100 %}%
+                                        {% else %}—{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- FATURAMENTO DIÁRIO (gráfico, exibido apenas com > 1 dia de dados) -->
+    <!-- ================================================================ -->
+    {% if daily_totals|length > 1 %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Faturamento Diário</h5>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- PRODUTOS MAIS VENDIDOS                                            -->
+    <!-- ================================================================ -->
+    {% if top_products %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-trophy"></i> Produtos Mais Vendidos</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Produto</th>
+                            <th class="text-end">Qtd</th>
+                            <th class="text-end">Faturamento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_products %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td>{{ row.product_name }}</td>
+                            <td class="text-end">{{ row.total_quantity }}</td>
+                            <td class="text-end text-success">R$ {{ row.total_revenue|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- ADICIONAIS MAIS SELECIONADOS                                      -->
+    <!-- ================================================================ -->
+    {% if top_addons %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-star"></i> Adicionais Mais Selecionados</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Adicional</th>
+                            <th class="text-end">Seleções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_addons %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td>{{ row.name }}</td>
+                            <td class="text-end">{{ row.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- TAMANHOS MAIS VENDIDOS                                            -->
+    <!-- ================================================================ -->
+    {% if top_sizes %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-cup-straw"></i> Tamanhos Mais Vendidos</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Tamanho</th>
+                            <th class="text-end">Qtd</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_sizes %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td>{{ row.size_name }}</td>
+                            <td class="text-end">{{ row.total_quantity }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- HORÁRIOS DE PICO                                                  -->
+    <!-- ================================================================ -->
+    {% if peak_hours %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clock"></i> Horários de Pico</h5>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="peakHoursChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
+    <!-- DIVERGÊNCIAS                                                       -->
+    <!-- ================================================================ -->
+    {% if divergences %}
+    <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning bg-opacity-10">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-warning"></i> Divergências (calculado ≠ informado)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Data / Hora</th>
+                            <th>Comanda</th>
+                            <th class="text-end">Calculado</th>
+                            <th class="text-end">Informado</th>
+                            <th class="text-end">Diferença</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in divergences %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'order-detail' order.pk %}">#{{ order.pk }}</a>
+                            </td>
+                            <td>{{ order.order_date|date:"d/m/Y" }} {{ order.order_time|time:"H:i" }}</td>
+                            <td>{{ order.comanda_number }}</td>
+                            <td class="text-end">R$ {{ order.total|floatformat:2 }}</td>
+                            <td class="text-end">R$ {{ order.informed_total|floatformat:2 }}</td>
+                            <td class="text-end {% if order.informed_total > order.total %}text-danger{% else %}text-warning{% endif %}">
+                                R$ {% widthratio order.informed_total order.total 1 %}
+                                ({{ order.informed_total|floatformat:2 }})
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}{# total_orders > 0 #}
+    {% endif %}{# start_date and end_date #}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCustomDates() {
+    var sel = document.querySelector('select[name="period"]');
+    var s = document.getElementById('custom-dates');
+    var e = document.getElementById('custom-dates-end');
+    if (!sel) return;
+    var show = sel.value === 'custom';
+    if (s) s.style.display = show ? 'block' : 'none';
+    if (e) e.style.display = show ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', function () {
+    toggleCustomDates();
+    var sel = document.querySelector('select[name="period"]');
+    if (sel) sel.addEventListener('change', toggleCustomDates);
+});
+</script>
+
+{% if sales_by_payment %}
+<script>
+(function () {
+    var ctx = document.getElementById('paymentChart');
+    if (!ctx) return;
+    var colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545'];
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for row in sales_by_payment %}'{{ row.label }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for row in sales_by_payment %}{{ row.total|unlocalize }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) {
+                            return ctx.label + ': R$ ' + ctx.parsed.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}());
+</script>
+{% endif %}
+
+{% if daily_totals|length > 1 %}
+<script>
+(function () {
+    var ctx = document.getElementById('dailyChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [{% for d in daily_totals %}'{{ d.order_date|date:"d/m" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Faturamento',
+                data: [{% for d in daily_totals %}{{ d.total_revenue|unlocalize }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25,135,84,0.08)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) { return 'R$ ' + ctx.parsed.y.toFixed(2); }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function (v) { return 'R$ ' + v.toFixed(0); } }
+                }
+            }
+        }
+    });
+}());
+</script>
+{% endif %}
+
+{% if peak_hours %}
+<script>
+(function () {
+    var ctx = document.getElementById('peakHoursChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for h in peak_hours %}'{{ h.hour }}h'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Pedidos',
+                data: [{% for h in peak_hours %}{{ h.count }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: 'rgba(13,110,253,0.75)',
+                borderColor: '#0d6efd',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}());
+</script>
+{% endif %}
+{% endblock %}
