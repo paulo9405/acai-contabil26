@@ -9,5 +9,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('finance.urls')),
+    path('', include('orders.urls')),
     path('', RedirectView.as_view(url='/dashboard/', permanent=False), name='home'),
 ]

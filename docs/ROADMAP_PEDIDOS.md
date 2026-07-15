@@ -653,7 +653,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 4 — Interface Operacional (Lançamento)
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Tela rápida mobile-first para o funcionário lançar pedidos.
 
@@ -673,17 +673,17 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fases 1, 2 e 3.
 
 **Checklist técnico:**
-- [ ] Catálogo embutido via `json_script` no template
-- [ ] JS: seleção de categoria → produto → tamanho → preço automático
-- [ ] JS: seleção de adicionais com contador de incluídos (limite visual)
-- [ ] JS: cálculo de subtotal e total em tempo real
-- [ ] Campo "valor informado na comanda" com alerta de divergência (não bloqueante)
-- [ ] Botão "Adicionar item" + lista de itens no carrinho
-- [ ] POST com arrays de campos no padrão `daily_closing.js`
-- [ ] View processa POST em `transaction.atomic`, chama `create_order`
-- [ ] `LoginRequiredMixin` + checagem de grupo `Operacao` **ou** `is_superuser`
-- [ ] Mensagens de sucesso/erro via `messages`
-- [ ] Testar em mobile (390px)
+- [x] Catálogo embutido via `json_script` no template
+- [x] JS: seleção de categoria → produto → tamanho → preço automático
+- [x] JS: seleção de adicionais com contador de incluídos (limite visual)
+- [x] JS: cálculo de subtotal e total em tempo real
+- [x] Campo "valor informado na comanda" com alerta de divergência (não bloqueante)
+- [x] Botão "Adicionar item" + lista de itens no carrinho
+- [x] POST com arrays de campos no padrão `daily_closing.js`
+- [x] View processa POST em `transaction.atomic`, chama `create_order`
+- [x] `LoginRequiredMixin` + checagem de grupo `Operacao` **ou** `is_superuser`
+- [x] Mensagens de sucesso/erro via `messages`
+- [ ] Testar em mobile (390px) — pendente: validação visual em dispositivo real
 
 **Testes esperados:**
 - POST cria pedido + itens + adicionais corretamente
@@ -692,10 +692,10 @@ Order.total = sum(line_total de todos os OrderItems)
 - Campos de horário e número da comanda são obrigatórios
 
 **Critérios de aceite:**
-- [ ] Lançar "Comanda 10 / 16:30 / PIX / Açaí Oreo 500ml + Nutella = R$ 33,50" em < 5 cliques após seleção de categoria
-- [ ] Tela funcional em mobile 390px
-- [ ] Total calculado bate com valor esperado
-- [ ] Cobertura ≥ 80%
+- [x] Lançar "Comanda 10 / 16:30 / PIX / Açaí Oreo 500ml + Nutella = R$ 33,50" em < 5 cliques após seleção de categoria
+- [ ] Tela funcional em mobile 390px — pendente: validação visual em dispositivo real
+- [x] Total calculado bate com valor esperado
+- [x] Cobertura ≥ 80%
 
 ---
 
@@ -994,6 +994,40 @@ Implementação completa de `Order`, `OrderItem`, `OrderItemAddon` com todos os 
 **Decisões registradas:** nenhuma nova — todas já cobertas por DA-01 a DA-19.
 
 **Pendências encontradas:** nenhuma. Fase 4 pode iniciar.
+
+---
+
+### Fase 4 — Interface Operacional (Lançamento)
+**Data:** 2026-07-15
+**Fase:** 4 — Interface Operacional
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Criação da tela de lançamento de pedidos: `OrderCreateView`, URLs, template mobile-first e `order_form.js`. Catálogo embutido via `json_script`. Fluxo Categoria → Produto → Tamanho → Adicionais → Carrinho → Envio. Data migration `0003_create_operacao_group` cria o grupo `Operacao`. Seleção automática quando há apenas um produto/tamanho; adicionais com contador visual de grátis vs. pagos; alerta de divergência não bloqueante.
+
+**Arquivos criados:**
+- `orders/migrations/0003_create_operacao_group.py`
+- `orders/views.py` — `OrderCreateView`
+- `orders/urls.py`
+- `templates/orders/order_form.html`
+- `static/js/order_form.js`
+- `tests/test_orders_views.py` — 18 testes
+
+**Arquivos modificados:**
+- `orders/selectors.py` — adicionado `get_catalog_json()`
+- `gestao_financeira/urls.py` — include `orders.urls`
+- `templates/base.html` — item "Pedidos" no menu
+- `finance/context_processors.py` — `NAV_PEDIDOS`
+
+**Migrações criadas:** `orders/migrations/0003_create_operacao_group.py`
+
+**Testes executados:** 197 passando, cobertura total 82.85%.
+
+**Decisões registradas:** nenhuma nova — todas cobertas por DA-01 a DA-19.
+
+**Pendências encontradas:**
+- Validação visual em mobile 390px pendente (requer dispositivo real / navegador).
+- Após lançamento bem-sucedido, redireciona para o formulário limpo (Phase 5 adicionará link para lista do dia).
 
 ---
 

@@ -10,6 +10,7 @@ NAV_LABELS = {
     'NAV_FECHAMENTO': 'Fechamento do Dia',
     'NAV_HISTORICO': 'Histórico',
     'NAV_RELATORIOS': 'Relatórios',
+    'NAV_PEDIDOS': 'Pedidos',
 }
 
 
