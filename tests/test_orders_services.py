@@ -426,11 +426,18 @@ class TestCancelOrder:
 
 @pytest.mark.django_db
 class TestUpdateOrder:
+    # Usa data passada para que create_order não dispare recalculate_closing_from_orders
+    # (que só atua em pedidos com order_date == today).
+    _PAST_DATE = date(2026, 7, 10)
 
     def _create_simple_order(self, user, variant_standard):
         return create_order(
+            comanda_number='10',
+            order_date=self._PAST_DATE,
+            order_time=time(16, 30),
+            payment_method=Order.PaymentMethod.PIX,
+            created_by=user,
             items=[{'variant': variant_standard, 'quantity': 1, 'addons': []}],
-            **_base_order_kwargs(user),
         )
 
     def test_funcionario_edita_sem_fechamento(self, user, variant_standard):

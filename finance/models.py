@@ -43,6 +43,11 @@ class DailyClosing(models.Model):
     Registra o resumo financeiro de um dia de operação.
     Apenas um fechamento permitido por data.
     """
+
+    class ClosingSource(models.TextChoices):
+        MANUAL = 'MANUAL', 'Manual'
+        ORDERS = 'ORDERS', 'Pedidos'
+
     date = models.DateField(
         unique=True,
         verbose_name='Data',
@@ -73,6 +78,13 @@ class DailyClosing(models.Model):
         verbose_name='Vendas em Cartão',
         help_text='Total de vendas pagas com cartão',
         validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    source = models.CharField(
+        max_length=10,
+        choices=ClosingSource.choices,
+        default=ClosingSource.MANUAL,
+        verbose_name='Fonte',
+        help_text='MANUAL: preenchido manualmente; ORDERS: calculado a partir dos pedidos'
     )
     notes = models.TextField(
         blank=True,

@@ -80,6 +80,17 @@
         </div>
     </div>
 
+    {% if closing_is_orders_source %}
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
+        <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
+        <div>
+            <strong>Vendas calculadas automaticamente pelos pedidos.</strong>
+            Os valores de Pedidos, Dinheiro, PIX e Cartão são preenchidos pelos pedidos registrados no sistema e não podem ser editados manualmente.
+            <a href="{% url 'order-list' %}?date={{ closing_date|date:'Y-m-d' }}" class="alert-link ms-1">Ver pedidos do dia →</a>
+        </div>
+    </div>
+    {% endif %}
+
     <form method="post" id="fechamento-form" novalidate>
         {% csrf_token %}
         <input type="hidden" name="closing_date" value="{{ closing_date|date:'Y-m-d' }}">
@@ -100,11 +111,12 @@
                         <input type="number"
                                name="order_count"
                                id="id_order_count"
-                               class="form-control form-control-lg text-center"
+                               class="form-control form-control-lg text-center{% if closing_is_orders_source %} bg-light{% endif %}"
                                value="{{ closing.order_count|default:'' }}"
                                min="0"
                                placeholder="0"
-                               autocomplete="off">
+                               autocomplete="off"
+                               {% if closing_is_orders_source %}readonly{% endif %}>
                     </div>
 
                     <!-- Dinheiro -->
@@ -115,12 +127,13 @@
                             <input type="number"
                                    name="cash_sales"
                                    id="id_cash_sales"
-                                   class="form-control"
+                                   class="form-control{% if closing_is_orders_source %} bg-light{% endif %}"
                                    value="{% if closing %}{{ closing.cash_sales|unlocalize }}{% endif %}"
                                    step="0.01"
                                    min="0"
                                    placeholder="0,00"
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   {% if closing_is_orders_source %}readonly{% endif %}>
                         </div>
                     </div>
 
@@ -132,12 +145,13 @@
                             <input type="number"
                                    name="pix_sales"
                                    id="id_pix_sales"
-                                   class="form-control"
+                                   class="form-control{% if closing_is_orders_source %} bg-light{% endif %}"
                                    value="{% if closing %}{{ closing.pix_sales|unlocalize }}{% endif %}"
                                    step="0.01"
                                    min="0"
                                    placeholder="0,00"
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   {% if closing_is_orders_source %}readonly{% endif %}>
                         </div>
                     </div>
 
@@ -149,12 +163,13 @@
                             <input type="number"
                                    name="card_sales"
                                    id="id_card_sales"
-                                   class="form-control"
+                                   class="form-control{% if closing_is_orders_source %} bg-light{% endif %}"
                                    value="{% if closing %}{{ closing.card_sales|unlocalize }}{% endif %}"
                                    step="0.01"
                                    min="0"
                                    placeholder="0,00"
-                                   autocomplete="off">
+                                   autocomplete="off"
+                                   {% if closing_is_orders_source %}readonly{% endif %}>
                         </div>
                     </div>
                 </div>

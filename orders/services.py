@@ -9,11 +9,70 @@ Convenções:
 
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Sum, Q
 from django.utils import timezone
 
 from orders.models import Order, OrderItem, OrderItemAddon, Product
 
 _UNSET = object()  # sentinel para distinguir "não passou" de None em update_order
+
+
+# ---------------------------------------------------------------------------
+# recalculate_closing_from_orders
+# ---------------------------------------------------------------------------
+
+def recalculate_closing_from_orders(*, date):
+    """
+    Cria ou atualiza o DailyClosing do dia com base nos pedidos ACTIVE.
+
+    Regras:
+    - Se não existe fechamento: cria com source='ORDERS'.
+    - Se existe com source='ORDERS': atualiza valores.
+    - Se existe com source='MANUAL': não toca (fonte manual tem precedência).
+
+    Retorna o DailyClosing resultante (ou None se existia MANUAL e não foi alterado).
+    """
+    from finance.models import DailyClosing
+    from finance.services import create_daily_closing, update_daily_closing
+
+    agg = Order.objects.filter(
+        order_date=date,
+        status=Order.Status.ACTIVE,
+    ).aggregate(
+        total_count=Sum('id', default=0),  # Count via Sum trick — usamos Count abaixo
+        cash=Sum('total', filter=Q(payment_method=Order.PaymentMethod.CASH)),
+        pix=Sum('total', filter=Q(payment_method=Order.PaymentMethod.PIX)),
+        card=Sum('total', filter=Q(payment_method=Order.PaymentMethod.CARD)),
+    )
+
+    # Contar separadamente (mais legível)
+    order_count = Order.objects.filter(order_date=date, status=Order.Status.ACTIVE).count()
+    cash_sales = agg['cash'] or Decimal('0.00')
+    pix_sales = agg['pix'] or Decimal('0.00')
+    card_sales = agg['card'] or Decimal('0.00')
+
+    try:
+        closing = DailyClosing.objects.get(date=date)
+        if closing.source != DailyClosing.ClosingSource.ORDERS:
+            # Fechamento manual — não sobrescrever
+            return closing
+        update_daily_closing(
+            closing=closing,
+            order_count=order_count,
+            cash_sales=cash_sales,
+            pix_sales=pix_sales,
+            card_sales=card_sales,
+        )
+        return closing
+    except DailyClosing.DoesNotExist:
+        return create_daily_closing(
+            date=date,
+            order_count=order_count,
+            cash_sales=cash_sales,
+            pix_sales=pix_sales,
+            card_sales=card_sales,
+            source=DailyClosing.ClosingSource.ORDERS,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +193,10 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
         order.total = order_total
         order.save(update_fields=['total', 'updated_at'])
 
+    today = timezone.now().date()
+    if order_date == today:
+        recalculate_closing_from_orders(date=order_date)
+
     return order
 
 
@@ -157,6 +220,10 @@ def cancel_order(*, order, cancelled_by, reason):
     order.cancelled_by = cancelled_by
     order.cancel_reason = reason.strip()
     order.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at'])
+
+    today = timezone.now().date()
+    if order.order_date == today:
+        recalculate_closing_from_orders(date=order.order_date)
 
     return order
 

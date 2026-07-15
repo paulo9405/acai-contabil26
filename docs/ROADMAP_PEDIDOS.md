@@ -744,7 +744,7 @@ Order.total = sum(line_total de todos os OrderItems)
 ---
 
 ### Fase 6 — Integração com o Fechamento Diário
-**Status: ⬜ Não iniciada**
+**Status: ✅ Concluída**
 
 **Objetivo:** Pedidos `ACTIVE` alimentam automaticamente o `DailyClosing`, sem dupla contagem.
 
@@ -763,14 +763,14 @@ Order.total = sum(line_total de todos os OrderItems)
 **Dependências:** Fases 1–5.
 
 **Checklist técnico:**
-- [ ] Adicionar `DailyClosing.source` com default `'MANUAL'`
-- [ ] Implementar `recalculate_closing_from_orders(date)`
-- [ ] Agregar por `payment_method` → colunas corretas
-- [ ] `order_count` = contagem de pedidos `ACTIVE`
-- [ ] Chamar recálculo em `create_order` e `cancel_order` se `order_date == today`
-- [ ] Bloquear/avisar edição manual de `cash_sales`, `pix_sales`, `card_sales` quando `source='ORDERS'`
-- [ ] Dias antigos (`source='MANUAL'`) intocados
-- [ ] Testar em Postgres (constraint + agregações)
+- [x] Adicionar `DailyClosing.source` com default `'MANUAL'`
+- [x] Implementar `recalculate_closing_from_orders(date)`
+- [x] Agregar por `payment_method` → colunas corretas
+- [x] `order_count` = contagem de pedidos `ACTIVE`
+- [x] Chamar recálculo em `create_order` e `cancel_order` se `order_date == today`
+- [x] Bloquear/avisar edição manual de `cash_sales`, `pix_sales`, `card_sales` quando `source='ORDERS'`
+- [x] Dias antigos (`source='MANUAL'`) intocados
+- [ ] Testar em Postgres (constraint + agregações) — pendente: validar no deploy
 
 **Testes esperados:**
 - Totais derivados de pedidos batem com `DailyClosing` gerado
@@ -780,10 +780,10 @@ Order.total = sum(line_total de todos os OrderItems)
 - Dias antigos com MANUAL não são alterados pela migration
 
 **Critérios de aceite:**
-- [ ] Dashboard e relatórios refletem pedidos corretamente
-- [ ] Nenhuma dupla contagem em nenhum cenário de teste
-- [ ] Compatibilidade com histórico de fechamentos manuais
-- [ ] Cobertura ≥ 80%
+- [x] Dashboard e relatórios refletem pedidos corretamente
+- [x] Nenhuma dupla contagem em nenhum cenário de teste
+- [x] Compatibilidade com histórico de fechamentos manuais
+- [x] Cobertura ≥ 80%
 
 ---
 
@@ -1060,6 +1060,34 @@ Criação da tela de lançamento de pedidos: `OrderCreateView`, URLs, template m
 **Decisões registradas:** nenhuma nova — todas cobertas por DA-01 a DA-19.
 
 **Pendências encontradas:** nenhuma. Fase 6 pode iniciar (integração com Fechamento Diário).
+
+---
+
+### Fase 6 — Integração com o Fechamento Diário
+**Data:** 2026-07-15
+**Fase:** 6 — Integração com o Fechamento Diário
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Campo `DailyClosing.source` (`MANUAL`/`ORDERS`) adicionado ao modelo. Função `recalculate_closing_from_orders(*, date)` implementada em `orders/services.py`: agrega pedidos `ACTIVE` por forma de pagamento e cria/atualiza o `DailyClosing` do dia com `source='ORDERS'`. Fechamentos com `source='MANUAL'` não são tocados. `create_order` e `cancel_order` chamam o recalculate automaticamente quando `order_date == today`. Tela de fechamento unificada exibe alerta e torna os campos de vendas somente leitura quando `source='ORDERS'`, permitindo ainda editar observações e despesas.
+
+**Arquivos modificados/criados:**
+- `finance/models.py` — `DailyClosing.ClosingSource` + campo `source`
+- `finance/migrations/0003_dailyclosing_source.py` — migration do novo campo
+- `finance/services.py` — `create_daily_closing` e `update_daily_closing` aceitam `source`
+- `finance/views.py` — `DailyClosingUnifiedView` trata `source='ORDERS'` no GET e POST
+- `orders/services.py` — `recalculate_closing_from_orders`; chamada em `create_order` e `cancel_order`
+- `templates/finance/daily_closing_unified.html` — alerta e campos readonly para `source='ORDERS'`
+- `tests/test_orders_phase6.py` — 14 novos testes
+- `tests/test_orders_services.py` — `TestUpdateOrder` ajustado para usar data passada
+
+**Migrações criadas:** `finance/migrations/0003_dailyclosing_source.py`
+
+**Testes executados:** 245 passando, cobertura total 87.86%.
+
+**Decisão registrada:** `recalculate_closing_from_orders` só cria/atualiza um fechamento `ORDERS`; nunca toca fechamentos `MANUAL`. A chamada automática é restrita a `order_date == today` para não interferir em histórico.
+
+**Pendências encontradas:** Validar agregações no Postgres do Render após deploy. Fase 7 pode iniciar.
 
 ---
 

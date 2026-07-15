@@ -663,6 +663,11 @@ class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
             'daily-closing', kwargs={'closing_date': 'PLACEHOLDER'}
         )
 
+        closing_is_orders_source = (
+            closing is not None
+            and closing.source == DailyClosing.ClosingSource.ORDERS
+        )
+
         context.update({
             'closing_date': closing_date,
             'today': today,
@@ -677,6 +682,7 @@ class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
             'prev_date_str': (closing_date - timedelta(1)).isoformat(),
             'next_date_str': (closing_date + timedelta(1)).isoformat() if closing_date < today else None,
             'fechamento_url_template': fechamento_url_template,
+            'closing_is_orders_source': closing_is_orders_source,
         })
         return context
 
@@ -735,14 +741,18 @@ class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
                 # 1. Criar ou atualizar DailyClosing
                 try:
                     existing = DailyClosing.objects.get(date=closing_date)
-                    update_daily_closing(
-                        closing=existing,
-                        order_count=order_count,
-                        cash_sales=cash_sales,
-                        pix_sales=pix_sales,
-                        card_sales=card_sales,
-                        notes=notes,
-                    )
+                    if existing.source == DailyClosing.ClosingSource.ORDERS:
+                        # Fechamento derivado de pedidos: só atualiza observações
+                        update_daily_closing(closing=existing, notes=notes)
+                    else:
+                        update_daily_closing(
+                            closing=existing,
+                            order_count=order_count,
+                            cash_sales=cash_sales,
+                            pix_sales=pix_sales,
+                            card_sales=card_sales,
+                            notes=notes,
+                        )
                 except DailyClosing.DoesNotExist:
                     create_daily_closing(
                         date=closing_date,
@@ -794,6 +804,13 @@ class DailyClosingUnifiedView(LoginRequiredMixin, TemplateView):
                 ).exclude(id__in=kept_ids).delete()
 
             messages.success(request, 'Fechamento salvo com sucesso!')
+
+            # Recalcular a partir dos pedidos se o fechamento é derivado de orders
+            existing_after = DailyClosing.objects.filter(date=closing_date).first()
+            if existing_after and existing_after.source == DailyClosing.ClosingSource.ORDERS:
+                from orders.services import recalculate_closing_from_orders
+                recalculate_closing_from_orders(date=closing_date)
+
         except Exception as e:
             messages.error(request, f'Erro ao salvar o fechamento: {e}')
 

@@ -403,7 +403,8 @@ def create_daily_closing(
     cash_sales: Decimal,
     pix_sales: Decimal,
     card_sales: Decimal,
-    notes: str = ''
+    notes: str = '',
+    source: str = DailyClosing.ClosingSource.MANUAL
 ) -> DailyClosing:
     """
     Cria um fechamento diário.
@@ -445,7 +446,8 @@ def create_daily_closing(
         cash_sales=cash_sales,
         pix_sales=pix_sales,
         card_sales=card_sales,
-        notes=notes
+        notes=notes,
+        source=source,
     )
 
     return closing
@@ -458,7 +460,8 @@ def update_daily_closing(
     cash_sales: Decimal = None,
     pix_sales: Decimal = None,
     card_sales: Decimal = None,
-    notes: str = None
+    notes: str = None,
+    source: str = None
 ) -> DailyClosing:
     """
     Atualiza um fechamento diário existente.
@@ -500,6 +503,9 @@ def update_daily_closing(
 
     if notes is not None:
         closing.notes = notes
+
+    if source is not None:
+        closing.source = source
 
     closing.save()
     return closing
