@@ -145,7 +145,7 @@ class TestDailyClosingViews:
     def test_closing_delete_requires_superuser(self, authenticated_client, daily_closing):
         """Testa que exclusão requer superuser."""
         url = reverse('closing-delete', kwargs={'pk': daily_closing.pk})
-        response = superuser_client.get(url)
+        response = authenticated_client.get(url)
         assert response.status_code == 403  # Forbidden
 
     def test_closing_delete_superuser(self, superuser_client, daily_closing):
@@ -238,7 +238,7 @@ class TestExpenseViews:
     def test_expense_delete_requires_superuser(self, authenticated_client, expense):
         """Testa que exclusão requer superuser."""
         url = reverse('expense-delete', kwargs={'pk': expense.pk})
-        response = superuser_client.get(url)
+        response = authenticated_client.get(url)
         assert response.status_code == 403
 
     def test_expense_delete_superuser(self, superuser_client, expense):
