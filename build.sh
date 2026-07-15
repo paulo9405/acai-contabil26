@@ -31,6 +31,10 @@ echo "👤 Creating superuser if needed..."
 python manage.py criar_superuser
 
 echo ""
+echo "🍇 Loading product catalog..."
+python manage.py load_catalog
+
+echo ""
 echo "========================================="
 echo "✅ Build completed successfully!"
 echo "========================================="
