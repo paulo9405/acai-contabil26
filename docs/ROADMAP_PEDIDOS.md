@@ -751,10 +751,10 @@ Itens `MANUAL` entram nesta mesma fórmula com `addons_total = 0`, ou seja `line
 - [x] Mensagens de sucesso/erro via `messages`
 - [ ] Testar em mobile (390px) — pendente: validação visual em dispositivo real
 
-**Adendo — Item avulso na tela de lançamento (P-13 / DA-20, pendente):**
-- [ ] Opção "Item avulso/manual" no fluxo de adicionar item (descrição + valor + quantidade)
-- [ ] JS: item `MANUAL` entra no carrinho e soma ao total como qualquer outro item
-- [ ] POST envia itens `MANUAL` (arrays de descrição/valor/quantidade) e a view os repassa ao `create_order`
+**Adendo — Item avulso na tela de lançamento (P-13 / DA-20) — implementado em 2026-07-16:**
+- [x] Opção "Item avulso/manual" no fluxo de adicionar item (descrição + valor + quantidade)
+- [x] JS: item `MANUAL` entra no carrinho e soma ao total como qualquer outro item
+- [x] POST envia itens `MANUAL` (arrays de descrição/valor/quantidade) e a view os repassa ao `create_order`
 
 **Testes esperados:**
 - POST cria pedido + itens + adicionais corretamente
@@ -768,6 +768,7 @@ Itens `MANUAL` entram nesta mesma fórmula com `addons_total = 0`, ou seja `line
 - [ ] Tela funcional em mobile 390px — pendente: validação visual em dispositivo real
 - [x] Total calculado bate com valor esperado
 - [x] Cobertura ≥ 80%
+- [x] Item avulso lançável pela tela (adendo P-13 — implementado em 2026-07-16)
 
 ---
 
@@ -1246,6 +1247,41 @@ Nova decisão arquitetural incorporada ao roadmap: vendas excepcionais fora do c
 **Testes executados:** nenhum.
 
 **Pendências encontradas:** implementar o adendo P-13/DA-20/DA-21 (campo `item_type`, `clean()`, `create_order`, migration, testes, UI e revisão de relatórios). **Aguardando aprovação do Paulo antes de implementar.**
+
+---
+
+### Adendo Fase 4 — UI do item avulso + correções de UX
+**Data:** 2026-07-16
+**Fase:** 4 — Interface Operacional (adendo)
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Implementação completa da UI para itens avulsos na tela de lançamento e duas correções de UX identificadas em teste manual em mobile.
+
+**Funcionalidade "Item avulso":**
+Botão "Adicionar item avulso" adicionado na etapa de categorias. Ao clicar, o fluxo entra no modo `MANUAL`: exibe `#manual-section` com campo de descrição (texto), valor unitário (número) e stepper de quantidade próprio. O botão "Adicionar ao pedido" fica habilitado apenas quando descrição e valor > 0 estão preenchidos. Itens `MANUAL` entram no carrinho com badge "Avulso" e somam ao total normalmente. O JS emite todos os 6 arrays paralelos por item (`item_type[]`, `item_variant_id[]`, `item_quantity[]`, `item_addon_ids[]`, `item_manual_description[]`, `item_manual_unit_price[]`); a view processa com compat retroativa (sem quebrar testes antigos).
+
+**Correção 1 — Carrinho apagado na re-renderização por erro:**
+Ao submeter com campos obrigatórios vazios, o servidor re-renderizava a página e o carrinho JS sumia, forçando o funcionário a montar o pedido novamente. Solução: `<input type="hidden" id="cart-state">` serializa `JSON.stringify(cart)` antes do submit; se a página re-renderizar com erros, o JS lê o campo na inicialização e reconstrói o carrinho automaticamente.
+
+**Correção 2 — Mensagens de erro sobrepostas em mobile:**
+Múltiplos erros de validação eram exibidos como alertas flutuantes `position: fixed` que se sobrepunham ao conteúdo da página. Substituídos por um bloco inline único `alert-danger` com lista de erros dentro do formulário, passado via `form_errors` no contexto (`_context(form_errors=errors)`). Testes de validação atualizados para checar `response.context['form_errors']` em vez de `wsgi_request._messages`.
+
+**Arquivos modificados:**
+- `orders/views.py` — `_context(form_errors=None)`, dois `render()` de erro usam `form_errors` no lugar de `messages.error()` em loop
+- `templates/orders/order_form.html` — `#btn-manual-item`, `#manual-section` (descrição + valor + qty stepper + btn-add-manual), `#cart-state` hidden, bloco `{% if form_errors %}` inline
+- `static/js/order_form.js` — reescrito: `currentMode`, `selectManualMode()`, `updateManualAddButton()`, `addManualItemToCart()`, `renderCart()` com badge Avulso, `resetItemBuilder()` limpa campos manuais, `handleSubmit()` emite 6 arrays + salva `cart-state`, `showOnlyStep()` inclui `manualSection`, restauração de carrinho na inicialização
+- `tests/test_orders_views.py` — 4 testes de validação migrados de `_messages` para `context['form_errors']`
+
+**Migrações criadas:** nenhuma.
+
+**Testes executados:** 296 passando, cobertura total 87.49%.
+
+**Decisões registradas:** nenhuma nova — comportamento conforme DA-20/DA-21.
+
+**Pendências encontradas:**
+- Validação visual em mobile 390px ainda pendente (requer dispositivo real).
+- Adendo Fase 7 (relatórios): confirmar comportamento de itens `MANUAL` nos gráficos de produto/tamanho/litros — avaliação pendente (baixa prioridade, ver R-09).
 
 ---
 
