@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -70,7 +71,9 @@ class OrderCreateView(LoginRequiredMixin, View):
     def get(self, request):
         if not _has_order_permission(request.user):
             raise PermissionDenied
-        return render(request, self.template_name, self._context())
+        ctx = self._context()
+        ctx['idempotency_key'] = str(uuid.uuid4())
+        return render(request, self.template_name, ctx)
 
     def post(self, request):
         if not _has_order_permission(request.user):
@@ -82,6 +85,8 @@ class OrderCreateView(LoginRequiredMixin, View):
                 return v if v >= Decimal('0') else None
             except (InvalidOperation, AttributeError):
                 return None
+
+        idempotency_key = request.POST.get('idempotency_key', '').strip() or None
 
         comanda_number = request.POST.get('comanda_number', '').strip()
         order_date_str = request.POST.get('order_date', '').strip()
@@ -134,9 +139,9 @@ class OrderCreateView(LoginRequiredMixin, View):
                 errors.append('Valor informado na comanda inválido.')
 
         if errors:
-            return render(request, self.template_name, self._context(
-                post_data=request.POST, form_errors=errors,
-            ))
+            ctx = self._context(post_data=request.POST, form_errors=errors)
+            ctx['idempotency_key'] = idempotency_key or str(uuid.uuid4())
+            return render(request, self.template_name, ctx)
 
         items = []
         for i in range(n_items):
@@ -183,9 +188,9 @@ class OrderCreateView(LoginRequiredMixin, View):
                 items.append({'variant': variant, 'quantity': qty, 'addons': addons})
 
         if errors:
-            return render(request, self.template_name, self._context(
-                post_data=request.POST, form_errors=errors,
-            ))
+            ctx = self._context(post_data=request.POST, form_errors=errors)
+            ctx['idempotency_key'] = idempotency_key or str(uuid.uuid4())
+            return render(request, self.template_name, ctx)
 
         try:
             order = create_order(
@@ -197,6 +202,7 @@ class OrderCreateView(LoginRequiredMixin, View):
                 created_by=request.user,
                 notes=notes,
                 informed_total=informed_total,
+                idempotency_key=idempotency_key,
             )
             messages.success(
                 request,

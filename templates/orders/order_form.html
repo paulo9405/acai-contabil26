@@ -88,6 +88,7 @@
 
     <form method="post" id="order-form" data-no-loading novalidate>
         {% csrf_token %}
+        <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
         <input type="hidden" id="cart-state" name="cart_state" value="{{ post_data.cart_state|default:'' }}">
         <div id="form-items"></div>
 

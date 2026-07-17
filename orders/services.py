@@ -197,9 +197,12 @@ def _create_manual_item(*, order, item_data):
     return line_total
 
 
-def create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by, notes='', informed_total=None):
+def create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by, notes='', informed_total=None, idempotency_key=None):
     """
     Cria um pedido completo com itens e adicionais em transaction.atomic.
+
+    Se `idempotency_key` for fornecida e já existir um pedido com essa chave,
+    retorna o pedido existente sem criar um novo (idempotência contra duplo submit).
 
     Parâmetro `items`: lista de dicts. Cada dict pode ser:
 
@@ -217,6 +220,12 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
 
     Retorna o Order criado.
     """
+    if idempotency_key:
+        try:
+            return Order.objects.get(idempotency_key=idempotency_key)
+        except Order.DoesNotExist:
+            pass
+
     with transaction.atomic():
         order = Order.objects.create(
             comanda_number=comanda_number,
@@ -228,6 +237,7 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
             notes=notes,
             status=Order.Status.ACTIVE,
             created_by=created_by,
+            idempotency_key=idempotency_key,
         )
 
         order_total = Decimal('0.00')

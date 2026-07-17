@@ -30,6 +30,8 @@
     const elResDespesas  = document.getElementById('resumo-despesas');
     const elResultado    = document.getElementById('resumo-resultado');
 
+    let isSubmitting = false;
+
     // =========================================================================
     // Utilitários
     // =========================================================================
@@ -182,6 +184,11 @@
     // =========================================================================
 
     function handleSubmit(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            return;
+        }
+
         clearErrors();
 
         let hasError   = false;
@@ -228,6 +235,14 @@
                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 firstInvalid.focus();
             }
+            return;
+        }
+
+        isSubmitting = true;
+        const btnSubmit = form ? form.querySelector('button[type="submit"]') : null;
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = 'Salvando…';
         }
     }
 

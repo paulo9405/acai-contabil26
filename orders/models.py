@@ -282,6 +282,12 @@ class Order(models.Model):
         verbose_name='Cancelado por'
     )
     cancel_reason = models.TextField(blank=True, verbose_name='Motivo do cancelamento')
+    idempotency_key = models.UUIDField(
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name='Chave de idempotência',
+    )
 
     class Meta:
         verbose_name = 'Pedido'

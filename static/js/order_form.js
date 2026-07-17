@@ -96,6 +96,7 @@
     var stepTitle        = document.getElementById('step-title');
 
     var cartStateInput   = document.getElementById('cart-state');
+    var isSubmitting     = false;
 
     // Elementos do fluxo avulso
     var manualSection    = document.getElementById('manual-section');
@@ -596,6 +597,16 @@
             orderForm.prepend(alertEl);
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
+        }
+
+        if (isSubmitting) {
+            e.preventDefault();
+            return;
+        }
+        isSubmitting = true;
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = 'Lançando…';
         }
 
         // Persiste o carrinho para restauração se houver erro de validação server-side
