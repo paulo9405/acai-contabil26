@@ -1473,7 +1473,7 @@ Antes de criar um PR, verifique:
 
 ## 16. Comandos Úteis
 
-### Desenvolvimento
+### Desenvolvimentos
 
 ```bash
 # Criar ambiente virtual
