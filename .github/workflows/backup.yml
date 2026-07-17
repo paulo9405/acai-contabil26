@@ -30,7 +30,8 @@ jobs:
             > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update -q
           sudo apt-get install -y postgresql-client-18
-          pg_dump --version
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/18/bin/pg_dump --version
 
       # Cria o dump comprimido. O script exporta BACKUP_FILE para $GITHUB_ENV.
       # NEON_DATABASE_URL deve ser o endpoint DIRETO do Neon (sem -pooler).
