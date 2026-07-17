@@ -1,7 +1,7 @@
 # ROADMAP — Backup Automático do Banco para o Google Drive (Açaí)
 
-> **Status:** documento de planejamento. Nada aqui foi implementado ainda.
-> Serve como guia pronto para implementação futura (previsão: quando o Paulo decidir, ~próxima semana).
+> **Status:** ✅ Implementado e validado em 2026-07-17.
+> Backup diário ativo via GitHub Actions. Primeiro backup confirmado no Google Drive.
 >
 > **Base:** adaptado do roadmap original do projeto *Nícia Track*
 > (`docs/backup_google_drive.md` copiado de lá). O Nícia Track assumia
