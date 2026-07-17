@@ -22,6 +22,12 @@ db.sqlite3-journal
 .env
 .env.local
 
+# Database backups (nunca versionar — contêm dados reais)
+*.dump
+*.sql
+*.sql.gz
+backups/
+
 # IDE
 .vscode/
 .idea/
