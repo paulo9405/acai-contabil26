@@ -1,0 +1,106 @@
+name: Backup Neon → Google Drive
+
+# Roda todo dia às 06:00 UTC = 03:00 BRT (banco ocioso, madrugada)
+# Para mudar para semanal: '0 6 * * 0'  (domingos)
+# Para testar manualmente: aba Actions → "Run workflow"
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Instala o cliente PostgreSQL compatível com o Neon (versão 18)
+      # Fonte: repositório oficial PGDG (https://www.postgresql.org/download/linux/ubuntu/)
+      - name: Instalar postgresql-client-18 (PGDG)
+        run: |
+          sudo apt-get install -y curl ca-certificates lsb-release
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update -q
+          sudo apt-get install -y postgresql-client-18
+          pg_dump --version
+
+      # Cria o dump comprimido. O script exporta BACKUP_FILE para $GITHUB_ENV.
+      # NEON_DATABASE_URL deve ser o endpoint DIRETO do Neon (sem -pooler).
+      - name: Criar backup do banco
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: bash scripts/backup_database.sh
+
+      - name: Instalar rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      # Escreve o conteúdo do secret RCLONE_CONFIG em ~/.config/rclone/rclone.conf
+      # O remote deve chamar-se "gdrive" (nome usado em todos os comandos abaixo).
+      - name: Configurar rclone
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${RCLONE_CONF}" > ~/.config/rclone/rclone.conf
+
+      - name: Enviar backup para o Google Drive
+        run: |
+          rclone copy "${BACKUP_FILE}" gdrive:acai-backups/
+          echo "==> Upload concluído: ${BACKUP_FILE}"
+
+      # Falha o job se o arquivo não for encontrado no Drive após o upload
+      - name: Validar upload no Drive
+        run: |
+          BASENAME=$(basename "${BACKUP_FILE}")
+          if rclone lsf gdrive:acai-backups/ --files-only | grep -qF "${BASENAME}"; then
+            echo "==> Validado: ${BASENAME} encontrado no Drive."
+          else
+            echo "ERRO: ${BASENAME} não encontrado no Drive após o upload." >&2
+            exit 1
+          fi
+
+      # Apaga os mais antigos somente APÓS confirmar que o novo upload está lá
+      - name: Rotação — manter os 15 backups mais recentes
+        run: |
+          TOTAL=$(rclone lsf gdrive:acai-backups/ --files-only | wc -l)
+          echo "==> Total de backups no Drive: ${TOTAL}"
+          if [ "${TOTAL}" -gt 15 ]; then
+            EXCEDENTES=$((TOTAL - 15))
+            echo "==> Removendo ${EXCEDENTES} backup(s) antigo(s)..."
+            rclone lsf gdrive:acai-backups/ --files-only | sort | head -n "${EXCEDENTES}" | \
+              while read -r F; do
+                echo "    Removendo: ${F}"
+                rclone deletefile "gdrive:acai-backups/${F}"
+              done
+            echo "==> Rotação concluída."
+          else
+            echo "==> Nenhuma remoção necessária (${TOTAL}/15)."
+          fi
+
+      # Resumo visível na aba Summary do run, mesmo em caso de falha
+      - name: Resumo do run
+        if: always()
+        run: |
+          {
+            echo "## Backup Neon → Google Drive"
+            echo ""
+            if [[ -n "${BACKUP_FILE:-}" && -f "${BACKUP_FILE:-}" ]]; then
+              SIZE=$(du -sh "${BACKUP_FILE}" | cut -f1)
+              REMAINING=$(rclone lsf gdrive:acai-backups/ --files-only 2>/dev/null | wc -l || echo "N/A")
+              echo "| Item | Valor |"
+              echo "|------|-------|"
+              echo "| Arquivo | \`$(basename "${BACKUP_FILE}")\` |"
+              echo "| Tamanho local | ${SIZE} |"
+              echo "| Backups no Drive (após rotação) | ${REMAINING} |"
+            else
+              echo "❌ Backup não foi criado — veja os logs acima."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
