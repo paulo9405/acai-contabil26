@@ -5,61 +5,70 @@ Formulários da aplicação finance.
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from finance.models import Expense, ExpenseCategory, DailyClosing
-from decimal import Decimal
+
+from finance.models import DailyClosing, Expense, ExpenseCategory
 
 
 class ExpenseForm(forms.ModelForm):
     """
     Formulário para criação e edição de despesas.
     """
+
     class Meta:
         model = Expense
-        fields = ['date', 'category', 'amount', 'description']
+        fields = ["date", "category", "amount", "description"]
         widgets = {
-            'date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control form-control-lg',
-            }),
-            'category': forms.Select(attrs={
-                'class': 'form-select form-select-lg',
-            }),
-            'amount': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'step': '0.01',
-                'min': '0.01',
-                'placeholder': '0,00',
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Descrição opcional da despesa',
-            }),
+            "date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-lg",
+                }
+            ),
+            "category": forms.Select(
+                attrs={
+                    "class": "form-select form-select-lg",
+                }
+            ),
+            "amount": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "step": "0.01",
+                    "min": "0.01",
+                    "placeholder": "0,00",
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Descrição opcional da despesa",
+                }
+            ),
         }
         labels = {
-            'date': 'Data',
-            'category': 'Categoria',
-            'amount': 'Valor (R$)',
-            'description': 'Descrição',
+            "date": "Data",
+            "category": "Categoria",
+            "amount": "Valor (R$)",
+            "description": "Descrição",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Filtrar apenas categorias ativas
-        self.fields['category'].queryset = ExpenseCategory.objects.filter(active=True)
+        self.fields["category"].queryset = ExpenseCategory.objects.filter(active=True)
 
     def clean_date(self):
         """Valida que a data não é futura."""
-        date = self.cleaned_data.get('date')
+        date = self.cleaned_data.get("date")
         if date and date > timezone.now().date():
-            raise ValidationError('A data não pode ser futura.')
+            raise ValidationError("A data não pode ser futura.")
         return date
 
     def clean_amount(self):
         """Valida que o valor é positivo."""
-        amount = self.cleaned_data.get('amount')
+        amount = self.cleaned_data.get("amount")
         if amount and amount <= 0:
-            raise ValidationError('O valor deve ser maior que zero.')
+            raise ValidationError("O valor deve ser maior que zero.")
         return amount
 
 
@@ -67,40 +76,47 @@ class ExpenseFilterForm(forms.Form):
     """
     Formulário para filtrar despesas por data e categoria.
     """
+
     date_from = forms.DateField(
         required=False,
-        label='Data inicial',
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-        })
+        label="Data inicial",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
     )
     date_to = forms.DateField(
         required=False,
-        label='Data final',
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-        })
+        label="Data final",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        ),
     )
     category = forms.ModelChoiceField(
         queryset=ExpenseCategory.objects.filter(active=True),
         required=False,
-        label='Categoria',
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-        }),
-        empty_label='Todas as categorias'
+        label="Categoria",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
+        empty_label="Todas as categorias",
     )
 
     def clean(self):
         """Valida que a data inicial não é maior que a final."""
         cleaned_data = super().clean()
-        date_from = cleaned_data.get('date_from')
-        date_to = cleaned_data.get('date_to')
+        date_from = cleaned_data.get("date_from")
+        date_to = cleaned_data.get("date_to")
 
         if date_from and date_to and date_from > date_to:
-            raise ValidationError('A data inicial não pode ser maior que a data final.')
+            raise ValidationError("A data inicial não pode ser maior que a data final.")
 
         return cleaned_data
 
@@ -109,70 +125,83 @@ class DailyClosingForm(forms.ModelForm):
     """
     Formulário para criação e edição de fechamento diário.
     """
+
     class Meta:
         model = DailyClosing
-        fields = ['date', 'order_count', 'cash_sales', 'pix_sales', 'card_sales', 'notes']
+        fields = ["date", "order_count", "cash_sales", "pix_sales", "card_sales", "notes"]
         widgets = {
-            'date': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control form-control-lg',
-            }),
-            'order_count': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'min': '0',
-                'placeholder': '0',
-            }),
-            'cash_sales': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0,00',
-            }),
-            'pix_sales': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0,00',
-            }),
-            'card_sales': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0,00',
-            }),
-            'notes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Observações opcionais sobre o dia',
-            }),
+            "date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-lg",
+                }
+            ),
+            "order_count": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "min": "0",
+                    "placeholder": "0",
+                }
+            ),
+            "cash_sales": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0,00",
+                }
+            ),
+            "pix_sales": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0,00",
+                }
+            ),
+            "card_sales": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "step": "0.01",
+                    "min": "0",
+                    "placeholder": "0,00",
+                }
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Observações opcionais sobre o dia",
+                }
+            ),
         }
         labels = {
-            'date': 'Data',
-            'order_count': 'Quantidade de Pedidos',
-            'cash_sales': 'Vendas em Dinheiro (R$)',
-            'pix_sales': 'Vendas em Pix (R$)',
-            'card_sales': 'Vendas em Cartão (R$)',
-            'notes': 'Observações',
+            "date": "Data",
+            "order_count": "Quantidade de Pedidos",
+            "cash_sales": "Vendas em Dinheiro (R$)",
+            "pix_sales": "Vendas em Pix (R$)",
+            "card_sales": "Vendas em Cartão (R$)",
+            "notes": "Observações",
         }
 
     def clean_date(self):
         """Valida que a data não é futura."""
-        date = self.cleaned_data.get('date')
+        date = self.cleaned_data.get("date")
         if date and date > timezone.now().date():
-            raise ValidationError('A data não pode ser futura.')
+            raise ValidationError("A data não pode ser futura.")
         return date
 
     def clean(self):
         """Validações customizadas do formulário."""
         cleaned_data = super().clean()
-        date = cleaned_data.get('date')
+        date = cleaned_data.get("date")
 
         # Valida fechamento duplicado (apenas na criação)
         if date and self.instance.pk is None:
             if DailyClosing.objects.filter(date=date).exists():
-                raise ValidationError({
-                    'date': f'Já existe um fechamento para {date.strftime("%d/%m/%Y")}.'
-                })
+                raise ValidationError(
+                    {"date": f"Já existe um fechamento para {date.strftime('%d/%m/%Y')}."}
+                )
 
         return cleaned_data
 
@@ -181,65 +210,72 @@ class ReportFilterForm(forms.Form):
     """
     Formulário para filtros de relatórios.
     """
+
     PERIOD_CHOICES = [
-        ('today', 'Hoje'),
-        ('yesterday', 'Ontem'),
-        ('last_7_days', 'Últimos 7 dias'),
-        ('last_30_days', 'Últimos 30 dias'),
-        ('this_month', 'Este mês'),
-        ('last_month', 'Mês passado'),
-        ('custom', 'Personalizado'),
+        ("today", "Hoje"),
+        ("yesterday", "Ontem"),
+        ("last_7_days", "Últimos 7 dias"),
+        ("last_30_days", "Últimos 30 dias"),
+        ("this_month", "Este mês"),
+        ("last_month", "Mês passado"),
+        ("custom", "Personalizado"),
     ]
 
     period = forms.ChoiceField(
         choices=PERIOD_CHOICES,
         required=False,
-        label='Período',
-        initial='this_month',
-        widget=forms.Select(attrs={
-            'class': 'form-select form-select-lg',
-            'onchange': 'toggleCustomDates()',
-        })
+        label="Período",
+        initial="this_month",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select form-select-lg",
+                "onchange": "toggleCustomDates()",
+            }
+        ),
     )
 
     start_date = forms.DateField(
         required=False,
-        label='Data inicial',
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control form-control-lg',
-            'id': 'start_date',
-        })
+        label="Data inicial",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control form-control-lg",
+                "id": "start_date",
+            }
+        ),
     )
 
     end_date = forms.DateField(
         required=False,
-        label='Data final',
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control form-control-lg',
-            'id': 'end_date',
-        })
+        label="Data final",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control form-control-lg",
+                "id": "end_date",
+            }
+        ),
     )
 
     def clean(self):
         """Valida as datas personalizadas."""
         cleaned_data = super().clean()
-        period = cleaned_data.get('period')
-        start_date = cleaned_data.get('start_date')
-        end_date = cleaned_data.get('end_date')
+        period = cleaned_data.get("period")
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
 
         # Se período personalizado, datas são obrigatórias
-        if period == 'custom':
+        if period == "custom":
             if not start_date:
-                raise ValidationError({
-                    'start_date': 'Data inicial é obrigatória para período personalizado.'
-                })
+                raise ValidationError(
+                    {"start_date": "Data inicial é obrigatória para período personalizado."}
+                )
             if not end_date:
-                raise ValidationError({
-                    'end_date': 'Data final é obrigatória para período personalizado.'
-                })
+                raise ValidationError(
+                    {"end_date": "Data final é obrigatória para período personalizado."}
+                )
             if start_date and end_date and start_date > end_date:
-                raise ValidationError('A data inicial não pode ser maior que a data final.')
+                raise ValidationError("A data inicial não pode ser maior que a data final.")
 
         return cleaned_data

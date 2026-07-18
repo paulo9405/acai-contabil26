@@ -2,29 +2,40 @@
 Configurações e fixtures compartilhadas para testes.
 """
 
-import pytest
+from datetime import timedelta
 from decimal import Decimal
-from datetime import date, timedelta
+
+import factory
+import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
-import factory
 from factory.django import DjangoModelFactory
 
-from finance.models import ExpenseCategory, DailyClosing, Expense
-from orders.models import ProductCategory, Size, Product, ProductVariant, Addon, Order, OrderItem, OrderItemAddon
-
+from finance.models import DailyClosing, Expense, ExpenseCategory
+from orders.models import (
+    Addon,
+    Order,
+    OrderItem,
+    OrderItemAddon,
+    Product,
+    ProductCategory,
+    ProductVariant,
+    Size,
+)
 
 # ============================================================================
 # FACTORIES
 # ============================================================================
 
+
 class UserFactory(DjangoModelFactory):
     """Factory para criar usuários de teste."""
+
     class Meta:
         model = User
 
-    username = factory.Sequence(lambda n: f'user{n}')
-    email = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')
+    username = factory.Sequence(lambda n: f"user{n}")
+    email = factory.LazyAttribute(lambda obj: f"{obj.username}@example.com")
     is_active = True
     is_staff = False
     is_superuser = False
@@ -34,48 +45,52 @@ class UserFactory(DjangoModelFactory):
         if extracted:
             self.set_password(extracted)
         else:
-            self.set_password('testpass123')
+            self.set_password("testpass123")
 
 
 class ExpenseCategoryFactory(DjangoModelFactory):
     """Factory para criar categorias de despesa."""
+
     class Meta:
         model = ExpenseCategory
 
-    name = factory.Sequence(lambda n: f'Categoria {n}')
+    name = factory.Sequence(lambda n: f"Categoria {n}")
     active = True
 
 
 class DailyClosingFactory(DjangoModelFactory):
     """Factory para criar fechamentos diários."""
+
     class Meta:
         model = DailyClosing
 
     date = factory.LazyFunction(lambda: timezone.now().date())
-    order_count = factory.Faker('random_int', min=10, max=50)
-    cash_sales = factory.Faker('pydecimal', left_digits=4, right_digits=2, positive=True)
-    pix_sales = factory.Faker('pydecimal', left_digits=4, right_digits=2, positive=True)
-    card_sales = factory.Faker('pydecimal', left_digits=4, right_digits=2, positive=True)
-    notes = factory.Faker('sentence')
+    order_count = factory.Faker("random_int", min=10, max=50)
+    cash_sales = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
+    pix_sales = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
+    card_sales = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
+    notes = factory.Faker("sentence")
 
 
 class ExpenseFactory(DjangoModelFactory):
     """Factory para criar despesas."""
+
     class Meta:
         model = Expense
 
     date = factory.LazyFunction(lambda: timezone.now().date())
     category = factory.SubFactory(ExpenseCategoryFactory)
-    amount = factory.Faker('pydecimal', left_digits=3, right_digits=2, positive=True)
-    description = factory.Faker('sentence')
+    amount = factory.Faker("pydecimal", left_digits=3, right_digits=2, positive=True)
+    description = factory.Faker("sentence")
 
 
 class ProductCategoryFactory(DjangoModelFactory):
     """Factory para criar categorias de produto."""
+
     class Meta:
         model = ProductCategory
 
-    name = factory.Sequence(lambda n: f'Categoria {n}')
+    name = factory.Sequence(lambda n: f"Categoria {n}")
     kind = ProductCategory.Kind.STANDARD
     sort_order = factory.Sequence(lambda n: n)
     active = True
@@ -83,10 +98,11 @@ class ProductCategoryFactory(DjangoModelFactory):
 
 class SizeFactory(DjangoModelFactory):
     """Factory para criar tamanhos."""
+
     class Meta:
         model = Size
 
-    name = factory.Sequence(lambda n: f'{(n + 1) * 300} ml')
+    name = factory.Sequence(lambda n: f"{(n + 1) * 300} ml")
     volume_ml = factory.Sequence(lambda n: (n + 1) * 300)
     sort_order = factory.Sequence(lambda n: n)
     active = True
@@ -94,12 +110,13 @@ class SizeFactory(DjangoModelFactory):
 
 class ProductFactory(DjangoModelFactory):
     """Factory para criar produtos."""
+
     class Meta:
         model = Product
 
     category = factory.SubFactory(ProductCategoryFactory)
-    name = factory.Sequence(lambda n: f'Produto {n}')
-    description = ''
+    name = factory.Sequence(lambda n: f"Produto {n}")
+    description = ""
     product_type = Product.ProductType.STANDARD
     sort_order = factory.Sequence(lambda n: n)
     active = True
@@ -107,23 +124,25 @@ class ProductFactory(DjangoModelFactory):
 
 class ProductVariantFactory(DjangoModelFactory):
     """Factory para criar variações de produto."""
+
     class Meta:
         model = ProductVariant
 
     product = factory.SubFactory(ProductFactory)
     size = factory.SubFactory(SizeFactory)
-    price = Decimal('18.00')
+    price = Decimal("18.00")
     included_addons_limit = 0
     active = True
 
 
 class AddonFactory(DjangoModelFactory):
     """Factory para criar adicionais."""
+
     class Meta:
         model = Addon
 
-    name = factory.Sequence(lambda n: f'Adicional {n}')
-    price = Decimal('3.00')
+    name = factory.Sequence(lambda n: f"Adicional {n}")
+    price = Decimal("3.00")
     is_free_option = False
     sort_order = factory.Sequence(lambda n: n)
     active = True
@@ -131,22 +150,26 @@ class AddonFactory(DjangoModelFactory):
 
 class OrderFactory(DjangoModelFactory):
     """Factory para criar pedidos."""
+
     class Meta:
         model = Order
 
     comanda_number = factory.Sequence(lambda n: str(n + 1))
     order_date = factory.LazyFunction(lambda: timezone.now().date())
-    order_time = factory.LazyFunction(lambda: timezone.now().time().replace(second=0, microsecond=0))
+    order_time = factory.LazyFunction(
+        lambda: timezone.now().time().replace(second=0, microsecond=0)
+    )
     payment_method = Order.PaymentMethod.PIX
-    total = Decimal('18.00')
+    total = Decimal("18.00")
     informed_total = None
     status = Order.Status.ACTIVE
-    notes = ''
+    notes = ""
     created_by = factory.SubFactory(UserFactory)
 
 
 class OrderItemFactory(DjangoModelFactory):
     """Factory para criar itens de pedido do tipo CATALOG."""
+
     class Meta:
         model = OrderItem
 
@@ -155,16 +178,17 @@ class OrderItemFactory(DjangoModelFactory):
     product = factory.SubFactory(ProductFactory)
     variant = factory.SubFactory(ProductVariantFactory)
     quantity = 1
-    product_name = 'Produto Teste'
-    variant_name = '300 ml'
-    size_name = '300 ml'
-    unit_price = Decimal('18.00')
-    addons_total = Decimal('0.00')
-    line_total = Decimal('18.00')
+    product_name = "Produto Teste"
+    variant_name = "300 ml"
+    size_name = "300 ml"
+    unit_price = Decimal("18.00")
+    addons_total = Decimal("0.00")
+    line_total = Decimal("18.00")
 
 
 class ManualOrderItemFactory(DjangoModelFactory):
     """Factory para criar itens de pedido do tipo MANUAL (avulso)."""
+
     class Meta:
         model = OrderItem
 
@@ -173,31 +197,33 @@ class ManualOrderItemFactory(DjangoModelFactory):
     product = None
     variant = None
     quantity = 1
-    product_name = 'Copo descartável'
-    variant_name = ''
-    size_name = ''
-    unit_price = Decimal('1.00')
-    addons_total = Decimal('0.00')
-    line_total = Decimal('1.00')
+    product_name = "Copo descartável"
+    variant_name = ""
+    size_name = ""
+    unit_price = Decimal("1.00")
+    addons_total = Decimal("0.00")
+    line_total = Decimal("1.00")
 
 
 class OrderItemAddonFactory(DjangoModelFactory):
     """Factory para criar adicionais de item de pedido."""
+
     class Meta:
         model = OrderItemAddon
 
     order_item = factory.SubFactory(OrderItemFactory)
     addon = factory.SubFactory(AddonFactory)
-    name = 'Adicional Teste'
-    unit_price = Decimal('3.00')
+    name = "Adicional Teste"
+    unit_price = Decimal("3.00")
     quantity = 1
     is_included = False
-    line_total = Decimal('3.00')
+    line_total = Decimal("3.00")
 
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def user(db):
@@ -245,9 +271,9 @@ def multiple_closings(db):
         closing = DailyClosingFactory(
             date=day,
             order_count=10 + i,
-            cash_sales=Decimal('100.00') + Decimal(i * 10),
-            pix_sales=Decimal('150.00') + Decimal(i * 10),
-            card_sales=Decimal('200.00') + Decimal(i * 10)
+            cash_sales=Decimal("100.00") + Decimal(i * 10),
+            pix_sales=Decimal("150.00") + Decimal(i * 10),
+            card_sales=Decimal("200.00") + Decimal(i * 10),
         )
         closings.append(closing)
     return closings
@@ -261,9 +287,7 @@ def multiple_expenses(db, expense_category):
     for i in range(7):
         day = today - timedelta(days=i)
         expense = ExpenseFactory(
-            date=day,
-            category=expense_category,
-            amount=Decimal('50.00') + Decimal(i * 5)
+            date=day, category=expense_category, amount=Decimal("50.00") + Decimal(i * 5)
         )
         expenses.append(expense)
     return expenses
@@ -278,7 +302,7 @@ def product_category(db):
 @pytest.fixture
 def size(db):
     """Cria um tamanho padrão (300 ml)."""
-    return SizeFactory(name='300 ml', volume_ml=300, sort_order=0)
+    return SizeFactory(name="300 ml", volume_ml=300, sort_order=0)
 
 
 @pytest.fixture
@@ -309,6 +333,7 @@ def order(db, user):
 def api_client():
     """Cliente Django para testes de views."""
     from django.test import Client
+
     return Client()
 
 
@@ -316,6 +341,7 @@ def api_client():
 def authenticated_client(user):
     """Cliente autenticado para testes de views."""
     from django.test import Client
+
     client = Client()
     client.force_login(user)
     return client
@@ -325,6 +351,7 @@ def authenticated_client(user):
 def superuser_client(superuser):
     """Cliente autenticado como superuser."""
     from django.test import Client
+
     client = Client()
     client.force_login(superuser)
     return client

@@ -8,8 +8,9 @@ Convenções:
 """
 
 from decimal import Decimal
+
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from orders.models import Order, OrderItem, OrderItemAddon, Product
@@ -20,6 +21,7 @@ _UNSET = object()  # sentinel para distinguir "não passou" de None em update_or
 # ---------------------------------------------------------------------------
 # recalculate_closing_from_orders
 # ---------------------------------------------------------------------------
+
 
 def recalculate_closing_from_orders(*, date):
     """
@@ -39,17 +41,17 @@ def recalculate_closing_from_orders(*, date):
         order_date=date,
         status=Order.Status.ACTIVE,
     ).aggregate(
-        total_count=Sum('id', default=0),  # Count via Sum trick — usamos Count abaixo
-        cash=Sum('total', filter=Q(payment_method=Order.PaymentMethod.CASH)),
-        pix=Sum('total', filter=Q(payment_method=Order.PaymentMethod.PIX)),
-        card=Sum('total', filter=Q(payment_method=Order.PaymentMethod.CARD)),
+        total_count=Sum("id", default=0),  # Count via Sum trick — usamos Count abaixo
+        cash=Sum("total", filter=Q(payment_method=Order.PaymentMethod.CASH)),
+        pix=Sum("total", filter=Q(payment_method=Order.PaymentMethod.PIX)),
+        card=Sum("total", filter=Q(payment_method=Order.PaymentMethod.CARD)),
     )
 
     # Contar separadamente (mais legível)
     order_count = Order.objects.filter(order_date=date, status=Order.Status.ACTIVE).count()
-    cash_sales = agg['cash'] or Decimal('0.00')
-    pix_sales = agg['pix'] or Decimal('0.00')
-    card_sales = agg['card'] or Decimal('0.00')
+    cash_sales = agg["cash"] or Decimal("0.00")
+    pix_sales = agg["pix"] or Decimal("0.00")
+    card_sales = agg["card"] or Decimal("0.00")
 
     try:
         closing = DailyClosing.objects.get(date=date)
@@ -79,6 +81,7 @@ def recalculate_closing_from_orders(*, date):
 # Helpers internos
 # ---------------------------------------------------------------------------
 
+
 def _resolve_addon_assignments(variant, addons):
     """
     Distribui adicionais entre incluídos (grátis) e pagos.
@@ -93,7 +96,7 @@ def _resolve_addon_assignments(variant, addons):
     limit = variant.included_addons_limit if is_build_your_own else 0
     included_count = 0
 
-    addons_total = Decimal('0.00')
+    addons_total = Decimal("0.00")
     assignments = []
 
     for addon in addons:
@@ -101,8 +104,8 @@ def _resolve_addon_assignments(variant, addons):
 
         if can_be_free:
             is_included = True
-            unit_price = Decimal('0.00')
-            line_total = Decimal('0.00')
+            unit_price = Decimal("0.00")
+            line_total = Decimal("0.00")
             included_count += 1
         else:
             is_included = False
@@ -110,13 +113,15 @@ def _resolve_addon_assignments(variant, addons):
             line_total = addon.price  # quantity sempre 1 na v1
             addons_total += line_total
 
-        assignments.append({
-            'addon': addon,
-            'name': addon.name,
-            'unit_price': unit_price,
-            'is_included': is_included,
-            'line_total': line_total,
-        })
+        assignments.append(
+            {
+                "addon": addon,
+                "name": addon.name,
+                "unit_price": unit_price,
+                "is_included": is_included,
+                "line_total": line_total,
+            }
+        )
 
     return addons_total, assignments
 
@@ -125,11 +130,12 @@ def _resolve_addon_assignments(variant, addons):
 # create_order
 # ---------------------------------------------------------------------------
 
+
 def _create_catalog_item(*, order, item_data):
     """Cria um OrderItem de catálogo e retorna o line_total."""
-    variant = item_data['variant']
-    quantity = item_data['quantity']
-    addons = item_data.get('addons', [])
+    variant = item_data["variant"]
+    quantity = item_data["quantity"]
+    addons = item_data.get("addons", [])
 
     product = variant.product
     size = variant.size
@@ -146,8 +152,8 @@ def _create_catalog_item(*, order, item_data):
         variant=variant,
         quantity=quantity,
         product_name=product.name,
-        variant_name=size.name if size else '',
-        size_name=size.name if size else '',
+        variant_name=size.name if size else "",
+        size_name=size.name if size else "",
         unit_price=unit_price,
         addons_total=addons_total,
         line_total=line_total,
@@ -156,12 +162,12 @@ def _create_catalog_item(*, order, item_data):
     for a in addon_assignments:
         OrderItemAddon.objects.create(
             order_item=order_item,
-            addon=a['addon'],
-            name=a['name'],
-            unit_price=a['unit_price'],
+            addon=a["addon"],
+            name=a["name"],
+            unit_price=a["unit_price"],
             quantity=1,
-            is_included=a['is_included'],
-            line_total=a['line_total'],
+            is_included=a["is_included"],
+            line_total=a["line_total"],
         )
 
     return line_total
@@ -169,14 +175,14 @@ def _create_catalog_item(*, order, item_data):
 
 def _create_manual_item(*, order, item_data):
     """Cria um OrderItem avulso (MANUAL) e retorna o line_total."""
-    description = str(item_data.get('description', '')).strip()
-    unit_price = item_data.get('unit_price')
-    quantity = item_data.get('quantity', 1)
+    description = str(item_data.get("description", "")).strip()
+    unit_price = item_data.get("unit_price")
+    quantity = item_data.get("quantity", 1)
 
     if not description:
-        raise ValueError('Descrição é obrigatória para item avulso.')
-    if unit_price is None or unit_price <= Decimal('0.00'):
-        raise ValueError('Valor unitário deve ser maior que zero para item avulso.')
+        raise ValueError("Descrição é obrigatória para item avulso.")
+    if unit_price is None or unit_price <= Decimal("0.00"):
+        raise ValueError("Valor unitário deve ser maior que zero para item avulso.")
 
     line_total = unit_price * quantity
 
@@ -187,17 +193,28 @@ def _create_manual_item(*, order, item_data):
         variant=None,
         quantity=quantity,
         product_name=description,
-        variant_name='',
-        size_name='',
+        variant_name="",
+        size_name="",
         unit_price=unit_price,
-        addons_total=Decimal('0.00'),
+        addons_total=Decimal("0.00"),
         line_total=line_total,
     )
 
     return line_total
 
 
-def create_order(*, comanda_number, order_date, order_time, payment_method, items, created_by, notes='', informed_total=None, idempotency_key=None):
+def create_order(
+    *,
+    comanda_number,
+    order_date,
+    order_time,
+    payment_method,
+    items,
+    created_by,
+    notes="",
+    informed_total=None,
+    idempotency_key=None,
+):
     """
     Cria um pedido completo com itens e adicionais em transaction.atomic.
 
@@ -232,7 +249,7 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
             order_date=order_date,
             order_time=order_time,
             payment_method=payment_method,
-            total=Decimal('0.00'),
+            total=Decimal("0.00"),
             informed_total=informed_total,
             notes=notes,
             status=Order.Status.ACTIVE,
@@ -240,17 +257,17 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
             idempotency_key=idempotency_key,
         )
 
-        order_total = Decimal('0.00')
+        order_total = Decimal("0.00")
 
         for item_data in items:
-            item_type = item_data.get('item_type', OrderItem.ItemType.CATALOG)
+            item_type = item_data.get("item_type", OrderItem.ItemType.CATALOG)
             if item_type == OrderItem.ItemType.MANUAL:
                 order_total += _create_manual_item(order=order, item_data=item_data)
             else:
                 order_total += _create_catalog_item(order=order, item_data=item_data)
 
         order.total = order_total
-        order.save(update_fields=['total', 'updated_at'])
+        order.save(update_fields=["total", "updated_at"])
 
     today = timezone.localdate()
     if order_date == today:
@@ -263,22 +280,25 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
 # cancel_order
 # ---------------------------------------------------------------------------
 
+
 def cancel_order(*, order, cancelled_by, reason):
     """
     Cancela um pedido com auditoria completa. `reason` é obrigatório.
     Não faz delete físico — apenas muda status para CANCELLED.
     """
     if not reason or not reason.strip():
-        raise ValueError('Motivo de cancelamento é obrigatório.')
+        raise ValueError("Motivo de cancelamento é obrigatório.")
 
     if order.status == Order.Status.CANCELLED:
-        raise ValueError('Este pedido já está cancelado.')
+        raise ValueError("Este pedido já está cancelado.")
 
     order.status = Order.Status.CANCELLED
     order.cancelled_at = timezone.now()
     order.cancelled_by = cancelled_by
     order.cancel_reason = reason.strip()
-    order.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at'])
+    order.save(
+        update_fields=["status", "cancelled_at", "cancelled_by", "cancel_reason", "updated_at"]
+    )
 
     today = timezone.localdate()
     if order.order_date == today:
@@ -291,7 +311,17 @@ def cancel_order(*, order, cancelled_by, reason):
 # update_order
 # ---------------------------------------------------------------------------
 
-def update_order(*, order, updated_by, comanda_number=None, order_time=None, payment_method=None, notes=None, informed_total=_UNSET):
+
+def update_order(
+    *,
+    order,
+    updated_by,
+    comanda_number=None,
+    order_time=None,
+    payment_method=None,
+    notes=None,
+    informed_total=_UNSET,
+):
     """
     Atualiza campos do cabeçalho do pedido, verificando a janela de edição (DA-17).
 
@@ -306,30 +336,30 @@ def update_order(*, order, updated_by, comanda_number=None, order_time=None, pay
     if not updated_by.is_superuser:
         if DailyClosing.objects.filter(date=order.order_date).exists():
             raise PermissionError(
-                'O dia já foi fechado. Apenas administradores podem alterar este pedido.'
+                "O dia já foi fechado. Apenas administradores podem alterar este pedido."
             )
 
-    update_fields = ['updated_at']
+    update_fields = ["updated_at"]
 
     if comanda_number is not None:
         order.comanda_number = comanda_number
-        update_fields.append('comanda_number')
+        update_fields.append("comanda_number")
 
     if order_time is not None:
         order.order_time = order_time
-        update_fields.append('order_time')
+        update_fields.append("order_time")
 
     if payment_method is not None:
         order.payment_method = payment_method
-        update_fields.append('payment_method')
+        update_fields.append("payment_method")
 
     if notes is not None:
         order.notes = notes
-        update_fields.append('notes')
+        update_fields.append("notes")
 
     if informed_total is not _UNSET:
         order.informed_total = informed_total
-        update_fields.append('informed_total')
+        update_fields.append("informed_total")
 
     order.save(update_fields=update_fields)
     return order

@@ -6,11 +6,11 @@ evitando repetição de strings em múltiplos arquivos.
 """
 
 NAV_LABELS = {
-    'NAV_INICIO': 'Início',
-    'NAV_FECHAMENTO': 'Fechamento do Dia',
-    'NAV_HISTORICO': 'Histórico',
-    'NAV_RELATORIOS': 'Relatórios',
-    'NAV_PEDIDOS': 'Pedidos',
+    "NAV_INICIO": "Início",
+    "NAV_FECHAMENTO": "Fechamento do Dia",
+    "NAV_HISTORICO": "Histórico",
+    "NAV_RELATORIOS": "Relatórios",
+    "NAV_PEDIDOS": "Pedidos",
 }
 
 

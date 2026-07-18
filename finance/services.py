@@ -5,18 +5,20 @@ All business rules, calculations, and data modifications should be placed here.
 Views should remain thin and delegate complex operations to services.
 """
 
-from decimal import Decimal
 from datetime import date, timedelta
-from typing import Dict, Any
-from django.utils import timezone
+from decimal import Decimal
+from typing import Any, Dict
+
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
-from finance.models import DailyClosing, Expense, ExpenseCategory
+from django.utils import timezone
 
+from finance.models import DailyClosing, Expense, ExpenseCategory
 
 # ============================================================================
 # CÁLCULOS BÁSICOS
 # ============================================================================
+
 
 def calculate_total_sales(*, closing: DailyClosing) -> Decimal:
     """
@@ -42,7 +44,7 @@ def calculate_average_ticket(*, closing: DailyClosing) -> Decimal:
         Ticket médio (vendas / pedidos). Retorna 0 se não houver pedidos.
     """
     if closing.order_count == 0:
-        return Decimal('0.00')
+        return Decimal("0.00")
 
     total_sales = calculate_total_sales(closing=closing)
     return total_sales / closing.order_count
@@ -58,10 +60,8 @@ def calculate_total_expenses(*, date: date) -> Decimal:
     Returns:
         Total de despesas da data
     """
-    result = Expense.objects.filter(date=date).aggregate(
-        total=Sum('amount')
-    )
-    return result['total'] or Decimal('0.00')
+    result = Expense.objects.filter(date=date).aggregate(total=Sum("amount"))
+    return result["total"] or Decimal("0.00")
 
 
 def calculate_daily_profit(*, date: date) -> Decimal:
@@ -78,7 +78,7 @@ def calculate_daily_profit(*, date: date) -> Decimal:
         closing = DailyClosing.objects.get(date=date)
         total_sales = calculate_total_sales(closing=closing)
     except DailyClosing.DoesNotExist:
-        total_sales = Decimal('0.00')
+        total_sales = Decimal("0.00")
 
     total_expenses = calculate_total_expenses(date=date)
     return total_sales - total_expenses
@@ -95,22 +95,17 @@ def calculate_period_sales(*, start_date: date, end_date: date) -> Decimal:
     Returns:
         Total de vendas no período
     """
-    closings = DailyClosing.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date
-    ).aggregate(
-        cash=Sum('cash_sales'),
-        pix=Sum('pix_sales'),
-        card=Sum('card_sales')
+    closings = DailyClosing.objects.filter(date__gte=start_date, date__lte=end_date).aggregate(
+        cash=Sum("cash_sales"), pix=Sum("pix_sales"), card=Sum("card_sales")
     )
 
-    total = Decimal('0.00')
-    if closings['cash']:
-        total += closings['cash']
-    if closings['pix']:
-        total += closings['pix']
-    if closings['card']:
-        total += closings['card']
+    total = Decimal("0.00")
+    if closings["cash"]:
+        total += closings["cash"]
+    if closings["pix"]:
+        total += closings["pix"]
+    if closings["card"]:
+        total += closings["card"]
 
     return total
 
@@ -126,12 +121,11 @@ def calculate_period_expenses(*, start_date: date, end_date: date) -> Decimal:
     Returns:
         Total de despesas no período
     """
-    result = Expense.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date
-    ).aggregate(total=Sum('amount'))
+    result = Expense.objects.filter(date__gte=start_date, date__lte=end_date).aggregate(
+        total=Sum("amount")
+    )
 
-    return result['total'] or Decimal('0.00')
+    return result["total"] or Decimal("0.00")
 
 
 def calculate_period_profit(*, start_date: date, end_date: date) -> Decimal:
@@ -161,12 +155,11 @@ def calculate_period_orders(*, start_date: date, end_date: date) -> int:
     Returns:
         Total de pedidos no período
     """
-    result = DailyClosing.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date
-    ).aggregate(total=Sum('order_count'))
+    result = DailyClosing.objects.filter(date__gte=start_date, date__lte=end_date).aggregate(
+        total=Sum("order_count")
+    )
 
-    return result['total'] or 0
+    return result["total"] or 0
 
 
 def calculate_period_average_ticket(*, start_date: date, end_date: date) -> Decimal:
@@ -183,7 +176,7 @@ def calculate_period_average_ticket(*, start_date: date, end_date: date) -> Deci
     total_orders = calculate_period_orders(start_date=start_date, end_date=end_date)
 
     if total_orders == 0:
-        return Decimal('0.00')
+        return Decimal("0.00")
 
     total_sales = calculate_period_sales(start_date=start_date, end_date=end_date)
     return total_sales / total_orders
@@ -192,6 +185,7 @@ def calculate_period_average_ticket(*, start_date: date, end_date: date) -> Deci
 # ============================================================================
 # MÉTRICAS POR PERÍODO
 # ============================================================================
+
 
 def get_daily_metrics(*, target_date: date = None) -> Dict[str, Any]:
     """
@@ -222,8 +216,8 @@ def get_daily_metrics(*, target_date: date = None) -> Dict[str, Any]:
         average_ticket = calculate_average_ticket(closing=closing)
     except DailyClosing.DoesNotExist:
         orders = 0
-        sales = Decimal('0.00')
-        average_ticket = Decimal('0.00')
+        sales = Decimal("0.00")
+        average_ticket = Decimal("0.00")
 
     # Calcular despesas
     expenses = calculate_total_expenses(date=target_date)
@@ -232,12 +226,12 @@ def get_daily_metrics(*, target_date: date = None) -> Dict[str, Any]:
     profit = sales - expenses
 
     return {
-        'date': target_date,
-        'orders': orders,
-        'sales': sales,
-        'expenses': expenses,
-        'profit': profit,
-        'average_ticket': average_ticket,
+        "date": target_date,
+        "orders": orders,
+        "sales": sales,
+        "expenses": expenses,
+        "profit": profit,
+        "average_ticket": average_ticket,
     }
 
 
@@ -290,22 +284,19 @@ def get_monthly_metrics(*, year: int = None, month: int = None) -> Dict[str, Any
     average_ticket = calculate_period_average_ticket(start_date=first_day, end_date=last_day)
 
     # Contar dias com fechamento
-    days_with_closing = DailyClosing.objects.filter(
-        date__gte=first_day,
-        date__lte=last_day
-    ).count()
+    days_with_closing = DailyClosing.objects.filter(date__gte=first_day, date__lte=last_day).count()
 
     return {
-        'year': year,
-        'month': month,
-        'orders': orders,
-        'sales': sales,
-        'expenses': expenses,
-        'profit': profit,
-        'average_ticket': average_ticket,
-        'days_with_closing': days_with_closing,
-        'first_day': first_day,
-        'last_day': last_day,
+        "year": year,
+        "month": month,
+        "orders": orders,
+        "sales": sales,
+        "expenses": expenses,
+        "profit": profit,
+        "average_ticket": average_ticket,
+        "days_with_closing": days_with_closing,
+        "first_day": first_day,
+        "last_day": last_day,
     }
 
 
@@ -324,14 +315,15 @@ def get_dashboard_metrics() -> Dict[str, Any]:
     month_metrics = get_monthly_metrics()
 
     return {
-        'today': today_metrics,
-        'month': month_metrics,
+        "today": today_metrics,
+        "month": month_metrics,
     }
 
 
 # ============================================================================
 # CRIAÇÃO DE DADOS
 # ============================================================================
+
 
 def create_expense_category(*, name: str, active: bool = True) -> ExpenseCategory:
     """
@@ -351,20 +343,13 @@ def create_expense_category(*, name: str, active: bool = True) -> ExpenseCategor
     if ExpenseCategory.objects.filter(name=name).exists():
         raise ValidationError(f'Já existe uma categoria com o nome "{name}".')
 
-    category = ExpenseCategory.objects.create(
-        name=name,
-        active=active
-    )
+    category = ExpenseCategory.objects.create(name=name, active=active)
 
     return category
 
 
 def create_expense(
-    *,
-    date: date,
-    category: ExpenseCategory,
-    amount: Decimal,
-    description: str = ''
+    *, date: date, category: ExpenseCategory, amount: Decimal, description: str = ""
 ) -> Expense:
     """
     Cria uma nova despesa.
@@ -383,14 +368,11 @@ def create_expense(
     """
     # Validações de negócio
     if amount <= 0:
-        raise ValidationError('O valor da despesa deve ser maior que zero.')
+        raise ValidationError("O valor da despesa deve ser maior que zero.")
 
     # Criar despesa
     expense = Expense.objects.create(
-        date=date,
-        category=category,
-        amount=amount,
-        description=description
+        date=date, category=category, amount=amount, description=description
     )
 
     return expense
@@ -403,8 +385,8 @@ def create_daily_closing(
     cash_sales: Decimal,
     pix_sales: Decimal,
     card_sales: Decimal,
-    notes: str = '',
-    source: str = DailyClosing.ClosingSource.MANUAL
+    notes: str = "",
+    source: str = DailyClosing.ClosingSource.MANUAL,
 ) -> DailyClosing:
     """
     Cria um fechamento diário.
@@ -425,19 +407,19 @@ def create_daily_closing(
     """
     # Validação: apenas um fechamento por dia
     if DailyClosing.objects.filter(date=date).exists():
-        raise ValidationError(f'Já existe um fechamento para {date.strftime("%d/%m/%Y")}.')
+        raise ValidationError(f"Já existe um fechamento para {date.strftime('%d/%m/%Y')}.")
 
     # Validação: data não pode ser futura
     if date > timezone.now().date():
-        raise ValidationError('A data não pode ser futura.')
+        raise ValidationError("A data não pode ser futura.")
 
     # Validação: valores não podem ser negativos
     if cash_sales < 0 or pix_sales < 0 or card_sales < 0:
-        raise ValidationError('Os valores de vendas não podem ser negativos.')
+        raise ValidationError("Os valores de vendas não podem ser negativos.")
 
     # Validação: quantidade de pedidos não pode ser negativa
     if order_count < 0:
-        raise ValidationError('A quantidade de pedidos não pode ser negativa.')
+        raise ValidationError("A quantidade de pedidos não pode ser negativa.")
 
     # Criar fechamento
     closing = DailyClosing.objects.create(
@@ -461,7 +443,7 @@ def update_daily_closing(
     pix_sales: Decimal = None,
     card_sales: Decimal = None,
     notes: str = None,
-    source: str = None
+    source: str = None,
 ) -> DailyClosing:
     """
     Atualiza um fechamento diário existente.
@@ -483,22 +465,22 @@ def update_daily_closing(
     # Atualizar apenas os campos fornecidos
     if order_count is not None:
         if order_count < 0:
-            raise ValidationError('A quantidade de pedidos não pode ser negativa.')
+            raise ValidationError("A quantidade de pedidos não pode ser negativa.")
         closing.order_count = order_count
 
     if cash_sales is not None:
         if cash_sales < 0:
-            raise ValidationError('O valor de vendas em dinheiro não pode ser negativo.')
+            raise ValidationError("O valor de vendas em dinheiro não pode ser negativo.")
         closing.cash_sales = cash_sales
 
     if pix_sales is not None:
         if pix_sales < 0:
-            raise ValidationError('O valor de vendas em Pix não pode ser negativo.')
+            raise ValidationError("O valor de vendas em Pix não pode ser negativo.")
         closing.pix_sales = pix_sales
 
     if card_sales is not None:
         if card_sales < 0:
-            raise ValidationError('O valor de vendas em cartão não pode ser negativo.')
+            raise ValidationError("O valor de vendas em cartão não pode ser negativo.")
         closing.card_sales = card_sales
 
     if notes is not None:
@@ -517,7 +499,7 @@ def update_expense(
     date: date = None,
     category: ExpenseCategory = None,
     amount: Decimal = None,
-    description: str = None
+    description: str = None,
 ) -> Expense:
     """
     Atualiza uma despesa existente.
@@ -544,7 +526,7 @@ def update_expense(
 
     if amount is not None:
         if amount <= 0:
-            raise ValidationError('O valor da despesa deve ser maior que zero.')
+            raise ValidationError("O valor da despesa deve ser maior que zero.")
         expense.amount = amount
 
     if description is not None:
