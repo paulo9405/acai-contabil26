@@ -35,7 +35,7 @@ def _has_order_permission(user):
 
 
 def _calculate_period_dates(period, custom_start, custom_end):
-    today = timezone.now().date()
+    today = timezone.localdate()
     if period == 'today':
         return today, today
     elif period == 'yesterday':

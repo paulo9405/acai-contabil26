@@ -252,7 +252,7 @@ def create_order(*, comanda_number, order_date, order_time, payment_method, item
         order.total = order_total
         order.save(update_fields=['total', 'updated_at'])
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     if order_date == today:
         recalculate_closing_from_orders(date=order_date)
 
@@ -280,7 +280,7 @@ def cancel_order(*, order, cancelled_by, reason):
     order.cancel_reason = reason.strip()
     order.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at'])
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     if order.order_date == today:
         recalculate_closing_from_orders(date=order.order_date)
 
