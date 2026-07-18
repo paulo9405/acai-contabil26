@@ -4,6 +4,7 @@ services:
     name: gestao-financeira
     runtime: python
     plan: free
+    autoDeploy: false
     buildCommand: "./build.sh"
     startCommand: "gunicorn gestao_financeira.wsgi:application"
     envVars:
