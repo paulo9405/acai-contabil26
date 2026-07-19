@@ -11,6 +11,7 @@ NAV_LABELS = {
     "NAV_HISTORICO": "Histórico",
     "NAV_RELATORIOS": "Relatórios",
     "NAV_PEDIDOS": "Pedidos",
+    "NAV_ESTOQUE": "Conferência de Estoque",
 }
 
 

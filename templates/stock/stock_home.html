@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Conferência de Estoque — Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- ÚLTIMA CONFERÊNCIA -->
+    {% if last_check %}
+    <a href="{% url 'stock-check-detail' pk=last_check.pk %}" class="text-decoration-none text-reset d-block mb-4">
+    <div class="card shadow-sm" style="cursor:pointer">
+        <div class="card-body text-center py-4">
+            <small class="text-muted d-block mb-2">Última conferência</small>
+            <div class="fw-semibold text-capitalize fs-6">{{ last_check.date|date:"l" }}</div>
+            <div class="fs-4 fw-bold lh-sm">{{ last_check.date|date:"d/m/Y" }}</div>
+            <div class="text-muted mt-1">{{ last_check.updated_at|time:"H:i" }}</div>
+            <div class="mt-2 text-muted small">
+                Realizada por: <strong>{{ last_check.created_by.username }}</strong>
+            </div>
+            {% if last_check.item_count != 0 %}
+            <div class="mt-2">
+                <span class="badge bg-warning text-dark">
+                    {{ last_check.item_count }} item{% if last_check.item_count != 1 %}ns{% endif %} na lista de compras
+                </span>
+            </div>
+            {% else %}
+            <div class="mt-2">
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Tudo OK</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    </a>
+    {% else %}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body text-center py-4 text-muted">
+            <i class="bi bi-clipboard d-block mb-2" style="font-size:2rem;opacity:.3"></i>
+            <small>Nenhuma conferência realizada ainda.</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- AÇÕES -->
+    <div class="d-grid gap-3">
+        <a href="{% url 'stock-check' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-clipboard-check"></i> Conferir estoque
+        </a>
+    </div>
+
+</div>
+{% endblock %}

@@ -351,6 +351,12 @@
                                 <i class="bi bi-receipt"></i> {{ NAV_PEDIDOS }}
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if url_name == 'stock-home' or url_name == 'stock-check' or url_name == 'stock-history' or url_name == 'stock-check-detail' %}active{% endif %}"
+                               href="{% url 'stock-home' %}">
+                                <i class="bi bi-clipboard-check"></i> {{ NAV_ESTOQUE }}
+                            </a>
+                        </li>
                         {% endwith %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">

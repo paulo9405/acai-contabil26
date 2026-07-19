@@ -20,5 +20,6 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("finance.urls")),
     path("", include("orders.urls")),
+    path("", include("stock.urls")),
     path("", home_redirect, name="home"),
 ]

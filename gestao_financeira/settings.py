@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     # Local apps
     "finance",
     "orders",
+    "stock",
 ]
 
 MIDDLEWARE = [

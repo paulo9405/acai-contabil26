@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Conferência de Estoque — Gestão Financeira{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Botões de status — altura mínima para toque */
+    .status-group .btn {
+        min-height: 36px;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    /* Linha de item */
+    .item-row {
+        padding: 0.6rem 1rem;
+    }
+
+    /* Nome do item não encolhe */
+    .item-name {
+        min-width: 0;
+        flex: 1;
+        padding-right: 0.75rem;
+        font-size: 0.95rem;
+    }
+
+    /* Cabeçalho de categoria */
+    .category-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #6c757d;
+        padding: 0 0.25rem;
+        margin-bottom: 0.4rem;
+        margin-top: 0.25rem;
+    }
+
+    /* Barra de salvar fixa na parte inferior */
+    .save-bar {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 1px solid #dee2e6;
+        padding: 0.75rem 0;
+        margin-top: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container pb-2">
+
+    <!-- CABEÇALHO -->
+    <div class="mb-3">
+        <h1 class="h4 mb-0">Conferência de Estoque</h1>
+        <small class="text-muted">{{ stock_check.date|date:"d/m/Y" }} — marque apenas o que está com problema</small>
+    </div>
+
+    <form method="post" id="check-form">
+        {% csrf_token %}
+
+        {% for cat_data in catalog %}
+        <div class="mb-3">
+            <div class="category-header">{{ cat_data.category.name }}</div>
+            <div class="card shadow-sm">
+                <div class="list-group list-group-flush">
+                    {% for item in cat_data.items %}
+                    <div class="list-group-item item-row">
+                        <div class="d-flex justify-content-between align-items-center">
+
+                            <span class="item-name text-truncate">{{ item.name }}</span>
+
+                            <div class="btn-group btn-group-sm status-group flex-shrink-0" role="group" aria-label="Status de {{ item.name }}">
+
+                                <input type="radio" class="btn-check" autocomplete="off"
+                                       name="item_{{ item.pk }}" id="ok_{{ item.pk }}" value="OK"
+                                       {% if item.current_status == 'OK' %}checked{% endif %}>
+                                <label class="btn btn-outline-success" for="ok_{{ item.pk }}">OK</label>
+
+                                <input type="radio" class="btn-check" autocomplete="off"
+                                       name="item_{{ item.pk }}" id="low_{{ item.pk }}" value="LOW"
+                                       {% if item.current_status == 'LOW' %}checked{% endif %}>
+                                <label class="btn btn-outline-warning" for="low_{{ item.pk }}">Baixo</label>
+
+                                <input type="radio" class="btn-check" autocomplete="off"
+                                       name="item_{{ item.pk }}" id="out_{{ item.pk }}" value="OUT"
+                                       {% if item.current_status == 'OUT' %}checked{% endif %}>
+                                <label class="btn btn-outline-danger" for="out_{{ item.pk }}">Acabou</label>
+
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- SALVAR -->
+        <div class="save-bar">
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-check2-circle"></i> Salvar conferência
+            </button>
+        </div>
+
+    </form>
+
+</div>
+{% endblock %}

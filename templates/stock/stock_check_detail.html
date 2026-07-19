@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Conferência de Estoque — {{ stock_check.date|date:"d/m/Y" }} — Gestão Financeira{% endblock %}
+
+{% block extra_css %}
+<style>
+    .shopping-item {
+        padding: 0.45rem 0;
+    }
+    .shopping-item + .shopping-item {
+        border-top: 1px solid #f0f0f0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <!-- CONFIRMAÇÃO -->
+    <div class="text-center mb-4 pt-2">
+        <i class="bi bi-check-circle-fill text-success d-block mb-2" style="font-size:3rem"></i>
+        <h1 class="h4 mb-0">Conferência realizada</h1>
+    </div>
+
+    <!-- INFO DA CONFERÊNCIA -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body text-center py-4">
+            <div class="fw-semibold text-capitalize">{{ stock_check.date|date:"l" }}</div>
+            <div class="fs-5 fw-bold mt-1">{{ stock_check.date|date:"d/m/Y" }}</div>
+            <div class="text-muted mt-1">{{ stock_check.updated_at|time:"H:i" }}</div>
+            <hr class="my-3 w-50 mx-auto opacity-25">
+            <div class="small text-muted">
+                Responsável: <strong>{{ stock_check.created_by.username }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- LISTA DE COMPRAS -->
+    {% if shopping_list.out or shopping_list.low %}
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-semibold">Lista de compras</h5>
+        </div>
+        <div class="card-body pb-2">
+
+            {% if shopping_list.out %}
+            <div class="mb-3">
+                <div class="fw-bold mb-2 text-danger">🔴 Acabou</div>
+                {% for name in shopping_list.out %}
+                <div class="shopping-item ps-1">• {{ name }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if shopping_list.low %}
+            <div class="{% if shopping_list.out %}pt-2 mt-2 border-top{% endif %}">
+                <div class="fw-bold mb-2" style="color:#fd7e14">🟡 Estoque baixo</div>
+                {% for name in shopping_list.low %}
+                <div class="shopping-item ps-1">• {{ name }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- COPIAR LISTA -->
+    <div class="d-grid mb-4">
+        <button id="copy-btn" type="button" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-clipboard"></i> Copiar lista
+        </button>
+    </div>
+
+    {% else %}
+
+    <!-- TUDO OK -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body text-center py-4">
+            <div class="display-6 mb-2">🎉</div>
+            <div class="fw-semibold fs-5 text-success mb-1">Tudo OK</div>
+            <p class="text-muted mb-0 small">Nenhum item precisa ser comprado.</p>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- AÇÕES SECUNDÁRIAS -->
+    <div class="d-grid gap-2">
+        <a href="{% url 'stock-check' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Editar conferência
+        </a>
+        <a href="{% url 'stock-home' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-house"></i> Início
+        </a>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if shopping_list.out or shopping_list.low %}
+<script>
+(function () {
+    'use strict';
+    var copyText = "{{ copy_text|escapejs }}";
+    var btn = document.getElementById('copy-btn');
+    if (!btn || !copyText) return;
+
+    function onCopied() {
+        btn.innerHTML = '<i class="bi bi-check2"></i> Copiado!';
+        btn.classList.replace('btn-outline-primary', 'btn-success');
+        setTimeout(function () {
+            btn.innerHTML = '<i class="bi bi-clipboard"></i> Copiar lista';
+            btn.classList.replace('btn-success', 'btn-outline-primary');
+        }, 2500);
+    }
+
+    function fallbackCopy() {
+        var ta = document.createElement('textarea');
+        ta.value = copyText;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); onCopied(); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+
+    btn.addEventListener('click', function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(copyText).then(onCopied).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
+    });
+}());
+</script>
+{% endif %}
+{% endblock %}
