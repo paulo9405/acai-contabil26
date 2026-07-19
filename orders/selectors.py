@@ -132,7 +132,14 @@ def get_liters_sold(*, start_date, end_date):
 
 
 def get_top_addons(*, start_date, end_date, limit=10):
-    return list(
+    date_filter = dict(
+        order__status=Order.Status.ACTIVE,
+        order__order_date__gte=start_date,
+        order__order_date__lte=end_date,
+    )
+
+    # Adicionais do Monte seu Açaí (vinculados via OrderItemAddon)
+    from_linked = (
         OrderItemAddon.objects.filter(
             order_item__order__status=Order.Status.ACTIVE,
             order_item__order__order_date__gte=start_date,
@@ -140,8 +147,30 @@ def get_top_addons(*, start_date, end_date, limit=10):
         )
         .values("name")
         .annotate(count=Count("id"))
-        .order_by("-count")[:limit]
     )
+
+    # Acréscimos avulsos do picker (MANUAL OrderItems cujo nome é um addon cadastrado)
+    addon_names = set(Addon.objects.filter(active=True).values_list("name", flat=True))
+    from_picker = (
+        OrderItem.objects.filter(
+            item_type=OrderItem.ItemType.MANUAL,
+            product_name__in=addon_names,
+            **date_filter,
+        )
+        .values("product_name")
+        .annotate(count=Count("id"))
+    )
+
+    totals: dict[str, int] = {}
+    for row in from_linked:
+        totals[row["name"]] = totals.get(row["name"], 0) + row["count"]
+    for row in from_picker:
+        totals[row["product_name"]] = totals.get(row["product_name"], 0) + row["count"]
+
+    return [
+        {"name": name, "count": count}
+        for name, count in sorted(totals.items(), key=lambda x: -x[1])[:limit]
+    ]
 
 
 def get_peak_hours(*, start_date, end_date):

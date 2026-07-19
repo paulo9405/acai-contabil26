@@ -401,7 +401,8 @@
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-outline-secondary w-100';
-            btn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:.4rem .5rem;line-height:1.3;gap:.1rem';
+            btn.dataset.addonName = addon.name;
+            btn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:.4rem .5rem;line-height:1.3;gap:.1rem;position:relative';
             btn.innerHTML =
                 '<span class="d-block" style="font-size:.87rem">' + addon.name + '</span>' +
                 '<span class="d-block" style="font-size:.8rem;font-weight:700;color:#198754">' + fmt(parsePrice(addon.price)) + '</span>';
@@ -423,6 +424,34 @@
             lineTotal:   price,
         });
         renderCart();
+    }
+
+    function syncAddonPickerCounts() {
+        if (!addonPickerButtons) return;
+        var counts = {};
+        cart.forEach(function (item) {
+            if (item.itemType === 'MANUAL') {
+                counts[item.description] = (counts[item.description] || 0) + 1;
+            }
+        });
+        addonPickerButtons.querySelectorAll('button[data-addon-name]').forEach(function (btn) {
+            var count = counts[btn.dataset.addonName] || 0;
+            var badge = btn.querySelector('.addon-qty-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'addon-qty-badge';
+                    btn.appendChild(badge);
+                }
+                badge.textContent = count;
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-outline-success');
+            } else {
+                if (badge) badge.remove();
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
     }
 
     // =========================================================================
@@ -538,6 +567,7 @@
             toggleSection(cartEmptyRow, true);
             btnSubmit.disabled = true;
             updateTotal();
+            syncAddonPickerCounts();
             return;
         }
 
@@ -582,6 +612,7 @@
 
         if (cartCount) cartCount.textContent = cart.length;
         updateTotal();
+        syncAddonPickerCounts();
     }
 
     function updateTotal() {
