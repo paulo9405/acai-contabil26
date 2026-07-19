@@ -20,10 +20,7 @@ def get_active_catalog_with_status(*, stock_check):
     Itens sem registro em `stock_check` recebem status 'OK'.
     Retorna lista de dicts: [{'category': StockCategory, 'items': [StockItem, ...]}, ...]
     """
-    check_map = {
-        sci.item_id: (sci.status, sci.buy_quantity)
-        for sci in stock_check.items.all()
-    }
+    check_map = {sci.item_id: (sci.status, sci.buy_quantity) for sci in stock_check.items.all()}
 
     categories = (
         StockCategory.objects.filter(active=True)

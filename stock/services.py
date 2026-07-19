@@ -92,6 +92,7 @@ def build_copy_text(*, shopping_list):
     Formata a lista de compras para colar no WhatsApp.
     Inclui quantidade se preenchida. Retorna string vazia se a lista estiver vazia.
     """
+
     def fmt(item):
         return f"• {item['name']} — {item['qty']}" if item["qty"] else f"• {item['name']}"
 
