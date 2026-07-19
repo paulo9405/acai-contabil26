@@ -124,6 +124,12 @@ class StockCheckItem(models.Model):
         choices=Status.choices,
         verbose_name="Status",
     )
+    buy_quantity = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        verbose_name="Quantidade a comprar",
+    )
 
     class Meta:
         verbose_name = "Item da Conferência"

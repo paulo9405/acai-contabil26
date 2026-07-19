@@ -52,14 +52,22 @@ class StockCheckView(LoginRequiredMixin, View):
         stock_check = get_or_create_today_check(user=request.user)
 
         statuses = {}
+        quantities = {}
         for key, value in request.POST.items():
             if key.startswith("item_") and value in ("LOW", "OUT"):
                 try:
                     statuses[int(key[5:])] = value
                 except ValueError:
                     pass
+            elif key.startswith("qty_"):
+                try:
+                    qty = value.strip()[:30]
+                    if qty:
+                        quantities[int(key[4:])] = qty
+                except ValueError:
+                    pass
 
-        save_stock_check(stock_check=stock_check, statuses=statuses)
+        save_stock_check(stock_check=stock_check, statuses=statuses, quantities=quantities)
         messages.success(request, "Conferência salva!")
         return redirect("stock-check-detail", pk=stock_check.pk)
 

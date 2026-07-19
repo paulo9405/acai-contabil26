@@ -37,25 +37,20 @@
     .shopping-item.checked .item-check {
         color: #198754;
     }
-    .item-qty {
-        width: 72px;
+    .item-qty-badge {
+        display: inline-block;
         font-size: 0.78rem;
-        padding: 2px 5px;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        text-align: center;
+        font-weight: 600;
+        color: #fff;
+        background: #0d6efd;
+        border-radius: 999px;
+        padding: 1px 9px;
+        white-space: nowrap;
+        margin-left: 0.5rem;
         flex-shrink: 0;
-        margin-right: 0.5rem;
-        background: #fff;
-        color: #333;
-        outline: none;
     }
-    .item-qty:focus {
-        border-color: #86b7fe;
-        box-shadow: 0 0 0 2px rgba(13,110,253,.15);
-    }
-    .shopping-item.checked .item-qty {
-        opacity: 0.45;
+    .shopping-item.checked .item-qty-badge {
+        opacity: 0.4;
     }
 </style>
 {% endblock %}
@@ -94,10 +89,10 @@
             {% if shopping_list.out %}
             <div class="mb-3">
                 <div class="fw-bold mb-2 text-danger">🔴 Acabou</div>
-                {% for name in shopping_list.out %}
-                <div class="shopping-item ps-1 cart-item" data-item="{{ name|escapejs }}" role="button" aria-pressed="false">
-                    <span class="item-text">• {{ name }}</span>
-                    <input type="text" class="item-qty" placeholder="qtd." maxlength="12">
+                {% for item in shopping_list.out %}
+                <div class="shopping-item ps-1 cart-item" data-item="{{ item.name|escapejs }}" role="button" aria-pressed="false">
+                    <span class="item-text">• {{ item.name }}</span>
+                    {% if item.qty %}<span class="item-qty-badge">{{ item.qty }}</span>{% endif %}
                     <i class="bi bi-circle item-check"></i>
                 </div>
                 {% endfor %}
@@ -107,10 +102,10 @@
             {% if shopping_list.low %}
             <div class="{% if shopping_list.out %}pt-2 mt-2 border-top{% endif %}">
                 <div class="fw-bold mb-2" style="color:#fd7e14">🟡 Estoque baixo</div>
-                {% for name in shopping_list.low %}
-                <div class="shopping-item ps-1 cart-item" data-item="{{ name|escapejs }}" role="button" aria-pressed="false">
-                    <span class="item-text">• {{ name }}</span>
-                    <input type="text" class="item-qty" placeholder="qtd." maxlength="12">
+                {% for item in shopping_list.low %}
+                <div class="shopping-item ps-1 cart-item" data-item="{{ item.name|escapejs }}" role="button" aria-pressed="false">
+                    <span class="item-text">• {{ item.name }}</span>
+                    {% if item.qty %}<span class="item-qty-badge">{{ item.qty }}</span>{% endif %}
                     <i class="bi bi-circle item-check"></i>
                 </div>
                 {% endfor %}
@@ -191,24 +186,17 @@
     }
 
     // ── Marcar itens no carrinho ──────────────────────────────────────────────
-    var STORAGE_KEY     = 'acai_cart_{{ stock_check.id }}';
-    var STORAGE_KEY_QTY = 'acai_cart_qty_{{ stock_check.id }}';
+    var STORAGE_KEY = 'acai_cart_{{ stock_check.id }}';
     var PING_URL = '{% url "stock-home" %}';
 
     var checked = {};
-    var qtys    = {};
     try {
         var saved = localStorage.getItem(STORAGE_KEY);
         if (saved) checked = JSON.parse(saved);
-        var savedQty = localStorage.getItem(STORAGE_KEY_QTY);
-        if (savedQty) qtys = JSON.parse(savedQty);
     } catch (e) {}
 
     function saveState() {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(checked));
-            localStorage.setItem(STORAGE_KEY_QTY, JSON.stringify(qtys));
-        } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(checked)); } catch (e) {}
     }
 
     function ping() {
@@ -225,40 +213,17 @@
                 ? 'bi bi-check-circle-fill item-check'
                 : 'bi bi-circle item-check';
         }
-        var input = el.querySelector('.item-qty');
-        if (input && input.value === '') {
-            input.value = qtys[name] || '';
-        }
     }
 
     document.querySelectorAll('.cart-item').forEach(function (el) {
         var name = el.dataset.item;
-        var input = el.querySelector('.item-qty');
-
-        // Restaura quantidade salva
-        if (input && qtys[name]) input.value = qtys[name];
-
         applyState(el, name);
-
-        // Toggle do check ao clicar na linha (mas não no input)
-        el.addEventListener('click', function (e) {
-            if (e.target === input) return;
+        el.addEventListener('click', function () {
             checked[name] = !checked[name];
             applyState(el, name);
             saveState();
             ping();
         });
-
-        // Salva quantidade ao digitar
-        if (input) {
-            input.addEventListener('click', function (e) { e.stopPropagation(); });
-            input.addEventListener('input', function () {
-                var val = input.value.trim();
-                if (val) { qtys[name] = val; } else { delete qtys[name]; }
-                saveState();
-                ping();
-            });
-        }
     });
 }());
 </script>

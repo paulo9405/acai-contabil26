@@ -46,6 +46,22 @@
         padding: 0.75rem 0;
         margin-top: 1.5rem;
     }
+
+    /* Campo de quantidade */
+    .qty-row {
+        margin-top: 0.4rem;
+        padding-left: 0.25rem;
+    }
+    .qty-row input {
+        font-size: 0.82rem;
+        padding: 0.2rem 0.5rem;
+        border-color: #dee2e6;
+        color: #555;
+    }
+    .qty-row input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 2px rgba(13,110,253,.15);
+    }
 </style>
 {% endblock %}
 
@@ -74,22 +90,35 @@
 
                             <div class="btn-group btn-group-sm status-group flex-shrink-0" role="group" aria-label="Status de {{ item.name }}">
 
-                                <input type="radio" class="btn-check" autocomplete="off"
+                                <input type="radio" class="btn-check status-radio" autocomplete="off"
                                        name="item_{{ item.pk }}" id="ok_{{ item.pk }}" value="OK"
+                                       data-item="{{ item.pk }}"
                                        {% if item.current_status == 'OK' %}checked{% endif %}>
                                 <label class="btn btn-outline-success" for="ok_{{ item.pk }}">OK</label>
 
-                                <input type="radio" class="btn-check" autocomplete="off"
+                                <input type="radio" class="btn-check status-radio" autocomplete="off"
                                        name="item_{{ item.pk }}" id="low_{{ item.pk }}" value="LOW"
+                                       data-item="{{ item.pk }}"
                                        {% if item.current_status == 'LOW' %}checked{% endif %}>
                                 <label class="btn btn-outline-warning" for="low_{{ item.pk }}">Baixo</label>
 
-                                <input type="radio" class="btn-check" autocomplete="off"
+                                <input type="radio" class="btn-check status-radio" autocomplete="off"
                                        name="item_{{ item.pk }}" id="out_{{ item.pk }}" value="OUT"
+                                       data-item="{{ item.pk }}"
                                        {% if item.current_status == 'OUT' %}checked{% endif %}>
                                 <label class="btn btn-outline-danger" for="out_{{ item.pk }}">Acabou</label>
 
                             </div>
+                        </div>
+
+                        <div class="qty-row {% if item.current_status == 'OK' %}d-none{% endif %}"
+                             data-qty-for="{{ item.pk }}">
+                            <input type="text"
+                                   name="qty_{{ item.pk }}"
+                                   class="form-control form-control-sm"
+                                   placeholder="Quantidade a comprar (ex: 10 un, 2 kg)"
+                                   maxlength="30"
+                                   value="{{ item.current_buy_quantity }}">
                         </div>
                     </div>
                     {% endfor %}
@@ -108,4 +137,27 @@
     </form>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+    document.querySelectorAll('.status-radio').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var qtyRow = document.querySelector('[data-qty-for="' + this.dataset.item + '"]');
+            if (!qtyRow) return;
+            if (this.value === 'OK') {
+                qtyRow.classList.add('d-none');
+                var input = qtyRow.querySelector('input');
+                if (input) input.value = '';
+            } else {
+                qtyRow.classList.remove('d-none');
+                var input = qtyRow.querySelector('input');
+                if (input) input.focus();
+            }
+        });
+    });
+}());
+</script>
 {% endblock %}

@@ -89,18 +89,21 @@ class TestBuildShoppingList:
 
     def test_out_items_grouped_correctly(self, check_with_items):
         result = build_shopping_list(stock_check=check_with_items)
-        assert "Açaí" in result["out"]
-        assert "Cupuaçu" in result["out"]
-        assert "Banana" not in result["out"]
+        out_names = [i["name"] for i in result["out"]]
+        assert "Açaí" in out_names
+        assert "Cupuaçu" in out_names
+        assert "Banana" not in out_names
 
     def test_low_items_grouped_correctly(self, check_with_items):
         result = build_shopping_list(stock_check=check_with_items)
-        assert "Banana" in result["low"]
-        assert "Açaí" not in result["low"]
+        low_names = [i["name"] for i in result["low"]]
+        assert "Banana" in low_names
+        assert "Açaí" not in low_names
 
     def test_out_items_sorted_alphabetically(self, check_with_items):
         result = build_shopping_list(stock_check=check_with_items)
-        assert result["out"] == sorted(result["out"])
+        names = [i["name"] for i in result["out"]]
+        assert names == sorted(names)
 
     def test_low_items_sorted_alphabetically(self, db, operacao_user, category):
         item_z = StockItem.objects.create(category=category, name="Zebu", sort_order=9)
@@ -113,7 +116,8 @@ class TestBuildShoppingList:
             stock_check=check, item=item_a, item_name=item_a.name, status="LOW"
         )
         result = build_shopping_list(stock_check=check)
-        assert result["low"] == ["Abacate", "Zebu"]
+        names = [i["name"] for i in result["low"]]
+        assert names == ["Abacate", "Zebu"]
 
 
 # ---------------------------------------------------------------------------
@@ -127,26 +131,26 @@ class TestBuildCopyText:
         assert result == ""
 
     def test_only_out_items(self):
-        result = build_copy_text(shopping_list={"out": ["Açaí", "Cupuaçu"], "low": []})
+        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}, {"name": "Cupuaçu", "qty": ""}], "low": []})
         assert "🔴 Acabou" in result
         assert "• Açaí" in result
         assert "• Cupuaçu" in result
         assert "🟡" not in result
 
     def test_only_low_items(self):
-        result = build_copy_text(shopping_list={"out": [], "low": ["Banana"]})
+        result = build_copy_text(shopping_list={"out": [], "low": [{"name": "Banana", "qty": ""}]})
         assert "🟡 Estoque baixo" in result
         assert "• Banana" in result
         assert "🔴" not in result
 
     def test_both_sections_separated_by_blank_line(self):
-        result = build_copy_text(shopping_list={"out": ["Açaí"], "low": ["Banana"]})
+        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]})
         assert "🔴 Acabou" in result
         assert "🟡 Estoque baixo" in result
         assert "\n\n" in result
 
     def test_out_section_appears_before_low_section(self):
-        result = build_copy_text(shopping_list={"out": ["Açaí"], "low": ["Banana"]})
+        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]})
         assert result.index("🔴") < result.index("🟡")
 
 
