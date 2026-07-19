@@ -233,6 +233,37 @@ ACAIS_PRONTOS = [
             "2 litros": "62.00",
         },
     ),
+    (
+        "14 Cupuaçu",
+        14,
+        {
+            "300 ml": "16.50",
+            "500 ml": "18.50",
+            "700 ml": "24.50",
+            "1 litro": "35.00",
+            "1,5 litro": "52.00",
+            "2 litros": "64.00",
+        },
+    ),
+    (
+        "15 Raspa de Chocolate com Cupuaçu",
+        15,
+        {
+            "300 ml": "15.00",
+            "500 ml": "20.00",
+            "700 ml": "22.00",
+            "1 litro": "32.00",
+        },
+    ),
+    (
+        "16 Açaí Paçoquinha",
+        16,
+        {
+            "1 litro": "48.00",
+            "1,5 litro": "58.00",
+            "2 litros": "66.00",
+        },
+    ),
 ]
 
 # Sorvetes: pote 2 litros (sem tamanho — size=None)
