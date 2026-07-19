@@ -35,6 +35,10 @@ echo "🍇 Loading product catalog..."
 python manage.py load_catalog
 
 echo ""
+echo "📋 Loading stock catalog..."
+python manage.py seed_stock_catalog
+
+echo ""
 echo "========================================="
 echo "✅ Build completed successfully!"
 echo "========================================="
