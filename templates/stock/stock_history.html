@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Histórico de Conferências — Gestão Financeira{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h5 mb-0 fw-semibold">Histórico de conferências</h1>
+        <a href="{% url 'stock-home' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Início
+        </a>
+    </div>
+
+    {% if checks %}
+    <div class="d-grid gap-2">
+        {% for check in checks %}
+        <a href="{% url 'stock-check-detail' pk=check.pk %}"
+           class="text-decoration-none text-reset">
+            <div class="card shadow-sm" style="cursor:pointer">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-semibold text-capitalize">
+                                {{ check.date|date:"l" }}, {{ check.date|date:"d/m/Y" }}
+                            </div>
+                            <div class="small text-muted mt-1">
+                                {{ check.updated_at|time:"H:i" }} &middot; {{ check.created_by.username }}
+                            </div>
+                        </div>
+                        <div class="text-end ms-3 flex-shrink-0">
+                            {% if check.item_count != 0 %}
+                            <span class="badge bg-warning text-dark">
+                                {{ check.item_count }} item{% if check.item_count != 1 %}ns{% endif %}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                Tudo OK
+                            </span>
+                            {% endif %}
+                            <i class="bi bi-chevron-right text-muted ms-2 small"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-clipboard d-block mb-2" style="font-size:2rem;opacity:.3"></i>
+            <p class="mb-3">Nenhuma conferência realizada ainda.</p>
+            <a href="{% url 'stock-check' %}" class="btn btn-primary">
+                <i class="bi bi-clipboard-check"></i> Fazer primeira conferência
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

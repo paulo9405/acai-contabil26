@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
 from stock.models import StockCheck
-from stock.selectors import get_active_catalog_with_status, get_last_check
+from stock.selectors import get_active_catalog_with_status, get_all_checks, get_last_check
 from stock.services import (
     build_copy_text,
     build_shopping_list,
@@ -58,6 +58,15 @@ class StockCheckView(LoginRequiredMixin, View):
         save_stock_check(stock_check=stock_check, statuses=statuses)
         messages.success(request, "Conferência salva!")
         return redirect("stock-check-detail", pk=stock_check.pk)
+
+
+class StockHistoryView(LoginRequiredMixin, View):
+    template_name = "stock/stock_history.html"
+
+    def get(self, request):
+        if not _has_stock_permission(request.user):
+            raise PermissionDenied
+        return render(request, self.template_name, {"checks": get_all_checks()})
 
 
 class StockCheckDetailView(LoginRequiredMixin, View):

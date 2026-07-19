@@ -43,6 +43,11 @@ def get_active_catalog_with_status(*, stock_check):
     return result
 
 
+def get_all_checks():
+    """Retorna todas as conferências ordenadas da mais recente para a mais antiga."""
+    return StockCheck.objects.select_related("created_by").order_by("-date")
+
+
 def get_check_detail(*, pk):
     """
     Retorna uma conferência pelo pk com itens pré-carregados.
