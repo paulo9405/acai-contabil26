@@ -25,6 +25,7 @@ def operacao_user(db):
 @pytest.fixture
 def operacao_client(operacao_user):
     from django.test import Client
+
     c = Client()
     c.force_login(operacao_user)
     return c
@@ -82,7 +83,6 @@ def check_with_items(db, operacao_user, item_a, item_b, item_c):
 
 @pytest.mark.django_db
 class TestBuildShoppingList:
-
     def test_empty_check_returns_empty_lists(self, empty_check):
         result = build_shopping_list(stock_check=empty_check)
         assert result == {"out": [], "low": []}
@@ -122,7 +122,6 @@ class TestBuildShoppingList:
 
 
 class TestBuildCopyText:
-
     def test_empty_list_returns_empty_string(self):
         result = build_copy_text(shopping_list={"out": [], "low": []})
         assert result == ""
@@ -158,18 +157,19 @@ class TestBuildCopyText:
 
 @pytest.mark.django_db
 class TestStockCheckDetailView:
-
     def _url(self, pk):
         return f"/estoque/{pk}/"
 
     def test_requires_login(self, db, empty_check):
         from django.test import Client
+
         resp = Client().get(self._url(empty_check.pk))
         assert resp.status_code == 302
         assert "/accounts/login/" in resp["Location"]
 
     def test_denies_user_without_permission(self, regular_user, empty_check):
         from django.test import Client
+
         c = Client()
         c.force_login(regular_user)
         resp = c.get(self._url(empty_check.pk))

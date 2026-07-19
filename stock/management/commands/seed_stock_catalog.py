@@ -186,9 +186,7 @@ class Command(BaseCommand):
             self._upsert_item(category, item_data, counters)
 
     def _upsert_item_dry(self, cat_name, item_data, counters):
-        exists = StockItem.objects.filter(
-            category__name=cat_name, name=item_data["name"]
-        ).exists()
+        exists = StockItem.objects.filter(category__name=cat_name, name=item_data["name"]).exists()
         if exists:
             counters["unchanged"] += 1
         else:

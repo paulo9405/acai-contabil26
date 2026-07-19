@@ -40,9 +40,7 @@ def save_stock_check(*, stock_check, statuses):
 
         to_delete = existing_ids - marked_ids
         if to_delete:
-            StockCheckItem.objects.filter(
-                stock_check=stock_check, item_id__in=to_delete
-            ).delete()
+            StockCheckItem.objects.filter(stock_check=stock_check, item_id__in=to_delete).delete()
 
         for item_id, status in statuses.items():
             if item_id in existing:

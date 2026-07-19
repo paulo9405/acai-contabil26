@@ -53,8 +53,4 @@ def get_check_detail(*, pk):
     Retorna uma conferência pelo pk com itens pré-carregados.
     Levanta StockCheck.DoesNotExist se não encontrado.
     """
-    return (
-        StockCheck.objects.select_related("created_by")
-        .prefetch_related("items")
-        .get(pk=pk)
-    )
+    return StockCheck.objects.select_related("created_by").prefetch_related("items").get(pk=pk)

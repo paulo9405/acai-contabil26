@@ -34,6 +34,7 @@ def superuser(db):
 @pytest.fixture
 def operacao_client(operacao_user):
     from django.test import Client
+
     c = Client()
     c.force_login(operacao_user)
     return c
@@ -42,6 +43,7 @@ def operacao_client(operacao_user):
 @pytest.fixture
 def superuser_client(superuser):
     from django.test import Client
+
     c = Client()
     c.force_login(superuser)
     return c
@@ -50,6 +52,7 @@ def superuser_client(superuser):
 @pytest.fixture
 def anon_client(db):
     from django.test import Client
+
     return Client()
 
 
@@ -79,6 +82,7 @@ class TestStockHomeView:
 
     def test_denies_user_without_permission(self, regular_user):
         from django.test import Client
+
         c = Client()
         c.force_login(regular_user)
         resp = c.get(self.URL)
@@ -93,9 +97,7 @@ class TestStockHomeView:
         assert resp.status_code == 200
 
     def test_shows_last_check_when_exists(self, operacao_client, operacao_user):
-        check = StockCheck.objects.create(
-            date=timezone.localdate(), created_by=operacao_user
-        )
+        check = StockCheck.objects.create(date=timezone.localdate(), created_by=operacao_user)
         resp = operacao_client.get(self.URL)
         assert resp.status_code == 200
         assert resp.context["last_check"].pk == check.pk
@@ -120,6 +122,7 @@ class TestStockCheckViewGet:
 
     def test_denies_user_without_permission(self, regular_user):
         from django.test import Client
+
         c = Client()
         c.force_login(regular_user)
         resp = c.get(self.URL)
@@ -175,6 +178,7 @@ class TestStockCheckViewPost:
 
     def test_post_denies_without_permission(self, regular_user):
         from django.test import Client
+
         c = Client()
         c.force_login(regular_user)
         resp = c.post(self.URL, {})

@@ -36,10 +36,14 @@ class StockCheckView(LoginRequiredMixin, View):
 
         stock_check = get_or_create_today_check(user=request.user)
         catalog = get_active_catalog_with_status(stock_check=stock_check)
-        return render(request, self.template_name, {
-            "stock_check": stock_check,
-            "catalog": catalog,
-        })
+        return render(
+            request,
+            self.template_name,
+            {
+                "stock_check": stock_check,
+                "catalog": catalog,
+            },
+        )
 
     def post(self, request):
         if not _has_stock_permission(request.user):
@@ -83,8 +87,12 @@ class StockCheckDetailView(LoginRequiredMixin, View):
         shopping_list = build_shopping_list(stock_check=stock_check)
         copy_text = build_copy_text(shopping_list=shopping_list)
 
-        return render(request, self.template_name, {
-            "stock_check": stock_check,
-            "shopping_list": shopping_list,
-            "copy_text": copy_text,
-        })
+        return render(
+            request,
+            self.template_name,
+            {
+                "stock_check": stock_check,
+                "shopping_list": shopping_list,
+                "copy_text": copy_text,
+            },
+        )

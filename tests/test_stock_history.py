@@ -27,6 +27,7 @@ def operacao_user(db):
 @pytest.fixture
 def operacao_client(operacao_user):
     from django.test import Client
+
     c = Client()
     c.force_login(operacao_user)
     return c
@@ -54,7 +55,6 @@ def three_checks(db, operacao_user):
 
 @pytest.mark.django_db
 class TestGetAllChecks:
-
     def test_returns_empty_queryset_when_no_checks(self):
         assert get_all_checks().count() == 0
 
@@ -82,12 +82,14 @@ class TestStockHistoryView:
 
     def test_requires_login(self, db):
         from django.test import Client
+
         resp = Client().get(self.URL)
         assert resp.status_code == 302
         assert "/accounts/login/" in resp["Location"]
 
     def test_denies_user_without_permission(self, regular_user):
         from django.test import Client
+
         c = Client()
         c.force_login(regular_user)
         resp = c.get(self.URL)
