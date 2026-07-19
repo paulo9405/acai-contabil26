@@ -1285,6 +1285,40 @@ Múltiplos erros de validação eram exibidos como alertas flutuantes `position:
 
 ---
 
+### Adendo Fase 4 — Acréscimos em produtos STANDARD (Açaís Prontos, Sorvetes, Vitaminas)
+**Data:** 2026-07-19
+**Fase:** 4 — Interface Operacional (adendo)
+**Responsável:** Paulo + Claude
+
+**Resumo:**
+Correção de bug de UI: a seção de acréscimos era exibida apenas para produtos `BUILD_YOUR_OWN` ("Monte seu Açaí"). Produtos `STANDARD` (Açaís Prontos, Sorvetes, Vitaminas) não mostravam a opção de adicionar acréscimos pagos. O backend (service + view) já suportava o fluxo corretamente — todo acréscimo em produto não-BYO é tratado como pago pelo `_resolve_addon_assignments` (`limit=0`, todos entram como `is_included=False`). A correção foi exclusivamente no front-end.
+
+**Alteração principal (JS):**
+- `selectVariant()`: em vez de `clearAddons()` para produtos não-BYO, agora chama `renderAddons(0)` — exibe a lista de acréscimos com todos os itens pagos (sem cota grátis).
+- `updateAddonLimitInfo()`: quando `limit === 0`, esconde o badge "X de Y grátis disponível(is)" (irrelevante para produtos que não têm cota).
+
+**Alteração de template:**
+- Rótulo da seção alterado de "Adicionais" para "Acréscimos (opcional)".
+- Comentário de código atualizado: seção não é mais exclusiva do "Monte seu Açaí".
+- Badge `#addon-limit-info` inicia com `d-none` (o JS decide quando exibir).
+
+**Arquivos modificados:**
+- `static/js/order_form.js` — `selectVariant()` e `updateAddonLimitInfo()`
+- `templates/orders/order_form.html` — rótulo e comentário da etapa 4
+
+**Arquivos criados:**
+- `tests/test_orders_paid_addons.py` — 8 testes novos (service + view)
+
+**Migrações criadas:** nenhuma.
+
+**Testes executados:** 304 passando, cobertura total 87.23%.
+
+**Decisões registradas:** nenhuma nova — comportamento já descrito em DA-19 (excedente de adicionais vira pago) se aplica também ao caso STANDARD, onde todo acréscimo é excedente por definição (`limit=0`).
+
+**Pendências encontradas:** nenhuma.
+
+---
+
 > *As próximas entradas serão adicionadas aqui ao final de cada fase.*
 
 ---

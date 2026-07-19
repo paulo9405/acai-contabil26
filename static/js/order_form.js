@@ -95,8 +95,9 @@
     var btnBackStep      = document.getElementById('btn-back-step');
     var stepTitle        = document.getElementById('step-title');
 
-    var cartStateInput   = document.getElementById('cart-state');
-    var isSubmitting     = false;
+    var cartStateInput      = document.getElementById('cart-state');
+    var addonPickerButtons  = document.getElementById('addon-picker-buttons');
+    var isSubmitting        = false;
 
     // Elementos do fluxo avulso
     var manualSection    = document.getElementById('manual-section');
@@ -371,15 +372,57 @@
 
     function updateAddonLimitInfo(remaining) {
         var limit = parseInt(addonSection.dataset.limit || '0', 10);
-        if (addonLimitInfo) {
-            addonLimitInfo.textContent = remaining + ' de ' + limit + ' grátis disponível(is)';
-            addonLimitInfo.className   = 'badge ms-1 ' + (remaining > 0 ? 'bg-success' : 'bg-secondary');
+        if (!addonLimitInfo) return;
+        if (limit === 0) {
+            addonLimitInfo.textContent = '';
+            addonLimitInfo.className   = 'd-none';
+            return;
         }
+        addonLimitInfo.className   = 'badge ms-1 ' + (remaining > 0 ? 'bg-success' : 'bg-secondary');
+        addonLimitInfo.textContent = remaining + ' de ' + limit + ' grátis disponível(is)';
     }
 
     function clearAddons() {
         addonCheckboxes.innerHTML = '';
         toggleSection(addonSection, false);
+    }
+
+    // =========================================================================
+    // Card de acréscimos avulsos (fora do fluxo do item)
+    // =========================================================================
+    function renderAddonPicker() {
+        if (!addonPickerButtons) return;
+        addonPickerButtons.innerHTML = '';
+
+        catalog.addons.forEach(function (addon) {
+            var col = document.createElement('div');
+            col.className = 'col';
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-outline-secondary w-100';
+            btn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:.4rem .5rem;line-height:1.3;gap:.1rem';
+            btn.innerHTML =
+                '<span class="d-block" style="font-size:.87rem">' + addon.name + '</span>' +
+                '<span class="d-block" style="font-size:.8rem;font-weight:700;color:#198754">' + fmt(parsePrice(addon.price)) + '</span>';
+            btn.addEventListener('click', function () { addAddonToCart(addon); });
+
+            col.appendChild(btn);
+            addonPickerButtons.appendChild(col);
+        });
+    }
+
+    function addAddonToCart(addon) {
+        var price = parsePrice(addon.price);
+        cart.push({
+            itemType:    'MANUAL',
+            description: addon.name,
+            unitPrice:   price,
+            quantity:    1,
+            addons:      [],
+            lineTotal:   price,
+        });
+        renderCart();
     }
 
     // =========================================================================
@@ -704,6 +747,7 @@
     }
 
     renderCategories();
+    renderAddonPicker();
     renderCart();
     updateAddButton();
     updateManualAddButton();
