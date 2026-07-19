@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from orders.models import Order, OrderItem, OrderItemAddon, Product, ProductCategory
+from orders.models import Order, Product, ProductCategory
 from orders.services import create_order
 from tests.conftest import (
     AddonFactory,
@@ -22,7 +22,6 @@ from tests.conftest import (
     SizeFactory,
     UserFactory,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -41,9 +40,7 @@ def size_500(db):
 
 @pytest.fixture
 def cat_standard(db):
-    return ProductCategoryFactory(
-        name="Açaís Prontos", kind=ProductCategory.Kind.STANDARD
-    )
+    return ProductCategoryFactory(name="Açaís Prontos", kind=ProductCategory.Kind.STANDARD)
 
 
 @pytest.fixture
