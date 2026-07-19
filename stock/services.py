@@ -79,7 +79,9 @@ def build_shopping_list(*, stock_check):
     Retorna {"out": [...], "low": [...]} com dicts {"name": str, "qty": str}.
     Ordem alfabética. Grupos vazios são incluídos como listas vazias.
     """
-    rows = stock_check.items.order_by("item_name").values_list("status", "item_name", "buy_quantity")
+    rows = stock_check.items.order_by("item_name").values_list(
+        "status", "item_name", "buy_quantity"
+    )
     out_items = [{"name": n, "qty": q} for s, n, q in rows if s == StockCheckItem.Status.OUT]
     low_items = [{"name": n, "qty": q} for s, n, q in rows if s == StockCheckItem.Status.LOW]
     return {"out": out_items, "low": low_items}

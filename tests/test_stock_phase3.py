@@ -131,7 +131,8 @@ class TestBuildCopyText:
         assert result == ""
 
     def test_only_out_items(self):
-        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}, {"name": "Cupuaçu", "qty": ""}], "low": []})
+        sl = {"out": [{"name": "Açaí", "qty": ""}, {"name": "Cupuaçu", "qty": ""}], "low": []}
+        result = build_copy_text(shopping_list=sl)
         assert "🔴 Acabou" in result
         assert "• Açaí" in result
         assert "• Cupuaçu" in result
@@ -144,13 +145,15 @@ class TestBuildCopyText:
         assert "🔴" not in result
 
     def test_both_sections_separated_by_blank_line(self):
-        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]})
+        sl = {"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]}
+        result = build_copy_text(shopping_list=sl)
         assert "🔴 Acabou" in result
         assert "🟡 Estoque baixo" in result
         assert "\n\n" in result
 
     def test_out_section_appears_before_low_section(self):
-        result = build_copy_text(shopping_list={"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]})
+        sl = {"out": [{"name": "Açaí", "qty": ""}], "low": [{"name": "Banana", "qty": ""}]}
+        result = build_copy_text(shopping_list=sl)
         assert result.index("🔴") < result.index("🟡")
 
 
