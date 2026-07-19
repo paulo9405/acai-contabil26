@@ -6,9 +6,36 @@
 <style>
     .shopping-item {
         padding: 0.45rem 0;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s;
     }
     .shopping-item + .shopping-item {
         border-top: 1px solid #f0f0f0;
+    }
+    .shopping-item:active {
+        opacity: 0.6;
+    }
+    .item-text {
+        flex: 1;
+        transition: color 0.2s;
+    }
+    .item-check {
+        margin-left: 0.75rem;
+        font-size: 1.1rem;
+        color: #ccc;
+        flex-shrink: 0;
+        transition: color 0.2s;
+    }
+    .shopping-item.checked .item-text {
+        text-decoration: line-through;
+        color: #adb5bd;
+    }
+    .shopping-item.checked .item-check {
+        color: #198754;
     }
 </style>
 {% endblock %}
@@ -48,7 +75,10 @@
             <div class="mb-3">
                 <div class="fw-bold mb-2 text-danger">🔴 Acabou</div>
                 {% for name in shopping_list.out %}
-                <div class="shopping-item ps-1">• {{ name }}</div>
+                <div class="shopping-item ps-1 cart-item" data-item="{{ name|escapejs }}" role="button" aria-pressed="false">
+                    <span class="item-text">• {{ name }}</span>
+                    <i class="bi bi-circle item-check"></i>
+                </div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -57,7 +87,10 @@
             <div class="{% if shopping_list.out %}pt-2 mt-2 border-top{% endif %}">
                 <div class="fw-bold mb-2" style="color:#fd7e14">🟡 Estoque baixo</div>
                 {% for name in shopping_list.low %}
-                <div class="shopping-item ps-1">• {{ name }}</div>
+                <div class="shopping-item ps-1 cart-item" data-item="{{ name|escapejs }}" role="button" aria-pressed="false">
+                    <span class="item-text">• {{ name }}</span>
+                    <i class="bi bi-circle item-check"></i>
+                </div>
                 {% endfor %}
             </div>
             {% endif %}

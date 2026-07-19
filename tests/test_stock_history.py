@@ -11,7 +11,6 @@ from django.utils import timezone
 from stock.models import StockCheck
 from stock.selectors import get_all_checks
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

@@ -9,7 +9,6 @@ from django.utils import timezone
 from stock.models import StockCategory, StockCheck, StockCheckItem, StockItem
 from stock.services import build_copy_text, build_shopping_list
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -64,9 +63,15 @@ def empty_check(db, operacao_user):
 @pytest.fixture
 def check_with_items(db, operacao_user, item_a, item_b, item_c):
     check = StockCheck.objects.create(date=timezone.localdate(), created_by=operacao_user)
-    StockCheckItem.objects.create(stock_check=check, item=item_a, item_name=item_a.name, status="OUT")
-    StockCheckItem.objects.create(stock_check=check, item=item_b, item_name=item_b.name, status="LOW")
-    StockCheckItem.objects.create(stock_check=check, item=item_c, item_name=item_c.name, status="OUT")
+    StockCheckItem.objects.create(
+        stock_check=check, item=item_a, item_name=item_a.name, status="OUT"
+    )
+    StockCheckItem.objects.create(
+        stock_check=check, item=item_b, item_name=item_b.name, status="LOW"
+    )
+    StockCheckItem.objects.create(
+        stock_check=check, item=item_c, item_name=item_c.name, status="OUT"
+    )
     return check
 
 
@@ -101,8 +106,12 @@ class TestBuildShoppingList:
         item_z = StockItem.objects.create(category=category, name="Zebu", sort_order=9)
         item_a = StockItem.objects.create(category=category, name="Abacate", sort_order=10)
         check = StockCheck.objects.create(date=timezone.localdate(), created_by=operacao_user)
-        StockCheckItem.objects.create(stock_check=check, item=item_z, item_name=item_z.name, status="LOW")
-        StockCheckItem.objects.create(stock_check=check, item=item_a, item_name=item_a.name, status="LOW")
+        StockCheckItem.objects.create(
+            stock_check=check, item=item_z, item_name=item_z.name, status="LOW"
+        )
+        StockCheckItem.objects.create(
+            stock_check=check, item=item_a, item_name=item_a.name, status="LOW"
+        )
         result = build_shopping_list(stock_check=check)
         assert result["low"] == ["Abacate", "Zebu"]
 

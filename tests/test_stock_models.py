@@ -9,7 +9,6 @@ from django.utils import timezone
 
 from stock.models import StockCategory, StockCheck, StockCheckItem, StockItem
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
