@@ -7,9 +7,14 @@ from decimal import Decimal
 
 import pytest
 
-from orders.models import Order, Product, ProductCategory
-from orders.selectors import get_order_detail, get_orders_by_date
-from orders.services import cancel_order, create_order, update_order
+from orders.models import Order, OrderPayment, Product, ProductCategory
+from orders.selectors import get_order_detail, get_orders_by_date, get_sales_by_payment_method
+from orders.services import (
+    cancel_order,
+    create_order,
+    recalculate_closing_from_orders,
+    update_order,
+)
 from tests.conftest import (
     AddonFactory,
     ProductCategoryFactory,
@@ -568,3 +573,110 @@ class TestSelectors:
         assert len(items) == 1
         addons = list(items[0].addons.all())
         assert len(addons) == 1
+
+
+# ---------------------------------------------------------------------------
+# Service: pagamento dividido
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestSplitPayment:
+    def test_pedido_simples_gera_uma_linha_de_pagamento(self, user, variant_standard):
+        order = create_order(
+            items=[{"variant": variant_standard, "quantity": 1, "addons": []}],
+            **_base_order_kwargs(user),
+        )
+        assert order.is_split is False
+        payments = list(order.payments.all())
+        assert len(payments) == 1
+        assert payments[0].method == Order.PaymentMethod.PIX
+        assert payments[0].amount == Decimal("30.00")
+
+    def test_pagamento_dividido_cria_duas_linhas(self, user, variant_standard):
+        kwargs = _base_order_kwargs(user)
+        kwargs["payment_method"] = Order.PaymentMethod.CASH
+        order = create_order(
+            items=[{"variant": variant_standard, "quantity": 1, "addons": []}],
+            payments=[
+                {"method": Order.PaymentMethod.CASH, "amount": Decimal("20.00")},
+                {"method": Order.PaymentMethod.CARD, "amount": Decimal("10.00")},
+            ],
+            **kwargs,
+        )
+        assert order.is_split is True
+        # Forma predominante (maior valor) fica em payment_method.
+        assert order.payment_method == Order.PaymentMethod.CASH
+        amounts = {p.method: p.amount for p in order.payments.all()}
+        assert amounts == {
+            Order.PaymentMethod.CASH: Decimal("20.00"),
+            Order.PaymentMethod.CARD: Decimal("10.00"),
+        }
+
+    def test_soma_diferente_do_total_levanta_erro(self, user, variant_standard):
+        with pytest.raises(ValueError):
+            create_order(
+                items=[{"variant": variant_standard, "quantity": 1, "addons": []}],
+                payments=[
+                    {"method": Order.PaymentMethod.CASH, "amount": Decimal("20.00")},
+                    {"method": Order.PaymentMethod.CARD, "amount": Decimal("5.00")},
+                ],
+                **_base_order_kwargs(user),
+            )
+        # Rollback: nenhum pedido persistido.
+        assert Order.objects.count() == 0
+        assert OrderPayment.objects.count() == 0
+
+    def test_relatorio_atribui_split_por_forma(self, user, variant_standard):
+        d = date(2026, 7, 15)
+        kwargs = _base_order_kwargs(user)
+        kwargs["order_date"] = d
+        create_order(
+            items=[{"variant": variant_standard, "quantity": 1, "addons": []}],
+            payments=[
+                {"method": Order.PaymentMethod.CASH, "amount": Decimal("20.00")},
+                {"method": Order.PaymentMethod.CARD, "amount": Decimal("10.00")},
+            ],
+            **kwargs,
+        )
+        closing = recalculate_closing_from_orders(date=d)
+        assert closing.order_count == 1
+        assert closing.cash_sales == Decimal("20.00")
+        assert closing.card_sales == Decimal("10.00")
+        assert closing.pix_sales == Decimal("0.00")
+
+        rows = get_sales_by_payment_method(start_date=d, end_date=d)
+        by_method = {r["payment_method"]: r["total"] for r in rows}
+        assert by_method[Order.PaymentMethod.CASH] == Decimal("20.00")
+        assert by_method[Order.PaymentMethod.CARD] == Decimal("10.00")
+
+    def test_update_para_dividido_e_de_volta_para_simples(self, superuser, variant_standard):
+        order = create_order(
+            items=[{"variant": variant_standard, "quantity": 1, "addons": []}],
+            **_base_order_kwargs(superuser),
+        )
+        # Vira dividido.
+        update_order(
+            order=order,
+            updated_by=superuser,
+            payments=[
+                {"method": Order.PaymentMethod.PIX, "amount": Decimal("18.00")},
+                {"method": Order.PaymentMethod.CARD, "amount": Decimal("12.00")},
+            ],
+        )
+        order.refresh_from_db()
+        assert order.is_split is True
+        assert order.payments.count() == 2
+
+        # Volta para simples via payment_method.
+        update_order(
+            order=order,
+            updated_by=superuser,
+            payment_method=Order.PaymentMethod.CARD,
+        )
+        order.refresh_from_db()
+        assert order.is_split is False
+        assert order.payments.count() == 1
+        p = order.payments.first()
+        assert p.method == Order.PaymentMethod.CARD
+        assert p.amount == order.total

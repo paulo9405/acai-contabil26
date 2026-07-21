@@ -14,11 +14,23 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from orders.models import Addon, Product, ProductCategory, ProductVariant, Size
+from orders.models import (
+    GIFT_CATEGORY_NAME,
+    Addon,
+    Product,
+    ProductCategory,
+    ProductVariant,
+    Size,
+)
 
 # ---------------------------------------------------------------------------
 # Dados do cardápio
 # ---------------------------------------------------------------------------
+
+# Categoria dos itens dados de graça (açaí do cartão fidelidade + acréscimos da
+# Quinta Maluca). Todos a R$ 0 — servem para contabilizar o que foi dado, sem
+# gerar receita. Nome definido em orders.models.GIFT_CATEGORY_NAME (fonte única).
+BRINDES_CATEGORY_NAME = GIFT_CATEGORY_NAME
 
 SIZES = [
     {"name": "300 ml", "volume_ml": 300, "sort_order": 1},
@@ -35,6 +47,7 @@ CATEGORIES = [
     {"name": "Sorvetes", "kind": ProductCategory.Kind.STANDARD, "sort_order": 3},
     {"name": "Vitaminas", "kind": ProductCategory.Kind.STANDARD, "sort_order": 4},
     {"name": "Adicionais", "kind": ProductCategory.Kind.ADDON, "sort_order": 5},
+    {"name": BRINDES_CATEGORY_NAME, "kind": ProductCategory.Kind.OTHER, "sort_order": 6},
 ]
 
 # Adicionais pagos (avulsos). is_free_option=True = elegível como grátis no Monte seu Açaí.
@@ -284,6 +297,26 @@ VITAMINAS = [
     ("Vitamina Açaí Tradicional", "20.00", "Açaí, leite e banana", 3),
 ]
 
+# Brindes (R$ 0). Açaí grátis do cartão fidelidade (500 ml Ninho).
+BRINDE_ACAI = ("Açaí Ninho (brinde)", "500 ml", "0.00")  # (nome, tamanho, preço)
+
+# Acréscimos da Quinta Maluca dados como cortesia (R$ 0, sem tamanho).
+# Os nomes casam com os do catálogo de Adicionais para que apareçam também no
+# ranking de adicionais mais pedidos (Fase 2).
+BRINDE_ADDONS = [
+    # (nome — casa com Addon,   sort_order)
+    ("Paçoca", 2),
+    ("Amendoim granulado", 3),
+    ("Sorvete", 4),
+    ("Gotas de chocolate", 5),
+    ("Calda de morango", 6),
+    ("Abacaxi", 7),
+    ("Leite Ninho", 8),
+    ("Cereal mix", 9),
+    ("Maltine", 10),
+    ("Banana", 11),
+]
+
 
 class Command(BaseCommand):
     help = "Carrega o cardápio inicial da Açaí da Rose (idempotente)"
@@ -311,6 +344,7 @@ class Command(BaseCommand):
             self._load_acais_prontos(dry_run, counters)
             self._load_sorvetes(dry_run, counters)
             self._load_vitaminas(dry_run, counters)
+            self._load_brindes(dry_run, counters)
 
             if dry_run:
                 # Desfaz tudo em dry-run
@@ -589,3 +623,66 @@ class Command(BaseCommand):
                     counters["unchanged"] += 1
             else:
                 counters["created"] += 1
+
+    def _load_brindes(self, dry_run, counters):
+        self.stdout.write("Brindes...")
+        if not dry_run:
+            cat = self._get_category(BRINDES_CATEGORY_NAME)
+            size_500 = self._get_size("500 ml")
+        else:
+            cat = None
+            size_500 = None
+
+        # Açaí grátis do cartão fidelidade (500 ml Ninho, R$ 0)
+        acai_name, _acai_size, acai_price = BRINDE_ACAI
+        product, _ = self._upsert(
+            Product,
+            lookup={"name": acai_name},
+            defaults={
+                "category": cat,
+                "description": "Brinde do cartão fidelidade",
+                "product_type": Product.ProductType.STANDARD,
+                "sort_order": 1,
+                "active": True,
+            },
+            dry_run=dry_run,
+            counters=counters,
+            label=acai_name,
+        )
+        if not dry_run:
+            self._upsert_brinde_variant(product, size_500, acai_price, counters)
+
+        # Acréscimos da Quinta Maluca dados como cortesia (R$ 0, sem tamanho)
+        for name, sort_order in BRINDE_ADDONS:
+            product, _ = self._upsert(
+                Product,
+                lookup={"name": name},
+                defaults={
+                    "category": cat,
+                    "description": "Acréscimo cortesia (Quinta Maluca)",
+                    "product_type": Product.ProductType.STANDARD,
+                    "sort_order": sort_order,
+                    "active": True,
+                },
+                dry_run=dry_run,
+                counters=counters,
+                label=name,
+            )
+            if not dry_run:
+                self._upsert_brinde_variant(product, None, "0.00", counters)
+
+    def _upsert_brinde_variant(self, product, size, price, counters):
+        variant, created = ProductVariant.objects.get_or_create(
+            product=product,
+            size=size,
+            defaults={"price": Decimal(price), "active": True},
+        )
+        if not created:
+            if variant.price != Decimal(price):
+                variant.price = Decimal(price)
+                variant.save()
+                counters["updated"] += 1
+            else:
+                counters["unchanged"] += 1
+        else:
+            counters["created"] += 1

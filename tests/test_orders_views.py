@@ -223,6 +223,61 @@ class TestOrderCreateViewSuccess:
         assert order.created_by == user
         assert order.items.count() == 1
 
+    def test_creates_split_payment_order(self, db):
+        client, _ = _operacao_client(db)
+        variant = _standard_variant(db)  # total 24.00
+
+        response = client.post(
+            reverse("order-create"),
+            {
+                "comanda_number": "12",
+                "order_date": "2026-07-15",
+                "order_time": "16:45",
+                "is_split": "1",
+                "split_method_1": "CASH",
+                "split_amount_1": "14.00",
+                "split_method_2": "CARD",
+                "split_amount_2": "10.00",
+                "item_variant_id[]": [str(variant.id)],
+                "item_quantity[]": ["1"],
+                "item_addon_ids[]": [""],
+            },
+        )
+
+        assert response.status_code == 302
+        order = Order.objects.get(comanda_number="12")
+        assert order.is_split is True
+        assert order.total == Decimal("24.00")
+        amounts = {p.method: p.amount for p in order.payments.all()}
+        assert amounts == {
+            Order.PaymentMethod.CASH: Decimal("14.00"),
+            Order.PaymentMethod.CARD: Decimal("10.00"),
+        }
+
+    def test_split_payment_sum_mismatch_shows_error(self, db):
+        client, _ = _operacao_client(db)
+        variant = _standard_variant(db)  # total 24.00
+
+        response = client.post(
+            reverse("order-create"),
+            {
+                "comanda_number": "13",
+                "order_date": "2026-07-15",
+                "order_time": "16:45",
+                "is_split": "1",
+                "split_method_1": "CASH",
+                "split_amount_1": "14.00",
+                "split_method_2": "CARD",
+                "split_amount_2": "5.00",
+                "item_variant_id[]": [str(variant.id)],
+                "item_quantity[]": ["1"],
+                "item_addon_ids[]": [""],
+            },
+        )
+
+        assert response.status_code == 200
+        assert not Order.objects.filter(comanda_number="13").exists()
+
     def test_creates_order_with_multiple_items(self, db):
         client, _ = _operacao_client(db)
         variant1 = _standard_variant(db)

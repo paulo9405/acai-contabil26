@@ -24,7 +24,7 @@ class TestLoadCatalog:
 
     def test_cria_categorias(self):
         self._run()
-        assert ProductCategory.objects.count() == 5
+        assert ProductCategory.objects.count() == 6
 
     def test_cria_adicionais(self):
         self._run()
@@ -32,26 +32,26 @@ class TestLoadCatalog:
 
     def test_cria_produtos(self):
         self._run()
-        assert Product.objects.count() == 27
+        assert Product.objects.count() == 38
 
     def test_cria_variacoes(self):
         self._run()
-        assert ProductVariant.objects.count() == 101
+        assert ProductVariant.objects.count() == 112
 
     def test_idempotente_sem_duplicar(self):
         self._run()
         self._run()
         assert Size.objects.count() == 6
-        assert ProductCategory.objects.count() == 5
+        assert ProductCategory.objects.count() == 6
         assert Addon.objects.count() == 27
-        assert Product.objects.count() == 27
-        assert ProductVariant.objects.count() == 101
+        assert Product.objects.count() == 38
+        assert ProductVariant.objects.count() == 112
 
     def test_idempotente_relatorio_sem_criacao(self):
         self._run()
         out = self._run()
         assert "criados: 0" in out
-        assert "sem alteração: 166" in out
+        assert "sem alteração: 189" in out
 
     def test_spot_acai_oreo_500ml(self):
         self._run()

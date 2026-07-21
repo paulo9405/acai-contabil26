@@ -124,7 +124,9 @@
                             </small>
                         </td>
                         <td>
-                            {% if order.payment_method == 'PIX' %}
+                            {% if order.is_split %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Misto</span>
+                            {% elif order.payment_method == 'PIX' %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle">Pix</span>
                             {% elif order.payment_method == 'CASH' %}
                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Dinheiro</span>

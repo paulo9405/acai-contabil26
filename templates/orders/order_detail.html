@@ -77,7 +77,16 @@
                 </div>
                 <div class="col-6 col-md-3">
                     <small class="text-muted d-block">Pagamento</small>
+                    {% if order.is_split %}
+                    <strong>Misto</strong>
+                    <small class="d-block text-muted">
+                        {% for p in order.payments.all %}
+                        {{ p.get_method_display }}: R$ {{ p.amount|floatformat:2 }}{% if not forloop.last %} · {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% else %}
                     <strong>{{ order.get_payment_method_display }}</strong>
+                    {% endif %}
                 </div>
             </div>
 

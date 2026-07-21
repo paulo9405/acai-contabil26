@@ -153,6 +153,57 @@
     {% endif %}
 
     <!-- ================================================================ -->
+    <!-- BRINDES E CORTESIAS                                               -->
+    <!-- ================================================================ -->
+    {% if gifts_report.items %}
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info bg-opacity-10">
+            <h5 class="mb-0"><i class="bi bi-gift"></i> Brindes e cortesias do período</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">Qtd</th>
+                            <th class="text-end">Valor unit. (est.)</th>
+                            <th class="text-end">Valor dado (est.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in gifts_report.items %}
+                        <tr>
+                            <td>
+                                {{ row.name }}
+                                {% if row.size_name %}<span class="text-muted">— {{ row.size_name }}</span>{% endif %}
+                            </td>
+                            <td class="text-end">{{ row.quantity }}</td>
+                            <td class="text-end text-muted">R$ {{ row.unit_price|floatformat:2 }}</td>
+                            <td class="text-end">R$ {{ row.value|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold border-top">
+                            <td>Total</td>
+                            <td class="text-end">{{ gifts_report.total_quantity }}</td>
+                            <td></td>
+                            <td class="text-end text-info">R$ {{ gifts_report.total_value|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <p class="small text-muted px-3 py-2 mb-0">
+                <i class="bi bi-info-circle"></i>
+                Valor estimado pelo preço de venda do item (não é custo de ingrediente).
+                Brindes não entram no faturamento.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
     <!-- FATURAMENTO DIÁRIO (gráfico, exibido apenas com > 1 dia de dados) -->
     <!-- ================================================================ -->
     {% if daily_totals|length > 1 %}

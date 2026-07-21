@@ -17,6 +17,7 @@ from orders.models import (
     Order,
     OrderItem,
     OrderItemAddon,
+    OrderPayment,
     Product,
     ProductCategory,
     ProductVariant,
@@ -165,6 +166,20 @@ class OrderFactory(DjangoModelFactory):
     status = Order.Status.ACTIVE
     notes = ""
     created_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def payments(self, create, extracted, **kwargs):
+        """Cria a linha de pagamento espelho (invariante: todo pedido tem pagamento).
+
+        Passe `payments=[...]` para definir linhas customizadas (pagamento dividido).
+        """
+        if not create:
+            return
+        if extracted is not None:
+            for p in extracted:
+                OrderPayment.objects.create(order=self, method=p["method"], amount=p["amount"])
+        else:
+            OrderPayment.objects.create(order=self, method=self.payment_method, amount=self.total)
 
 
 class OrderItemFactory(DjangoModelFactory):

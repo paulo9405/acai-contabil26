@@ -5,6 +5,11 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 
+# Nome da categoria que agrupa itens dados de graça (açaí do cartão fidelidade
+# e acréscimos cortesia da Quinta Maluca). Fonte única de verdade — usada no
+# seed (load_catalog) e nos relatórios para identificar brindes/cortesias.
+GIFT_CATEGORY_NAME = "Brindes"
+
 
 class ProductCategory(models.Model):
     """
@@ -244,6 +249,11 @@ class Order(models.Model):
     payment_method = models.CharField(
         max_length=10, choices=PaymentMethod.choices, verbose_name="Forma de pagamento"
     )
+    is_split = models.BooleanField(
+        default=False,
+        verbose_name="Pagamento dividido",
+        help_text="True quando o pedido foi pago em mais de uma forma (ver linhas de pagamento).",
+    )
     total = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -296,6 +306,13 @@ class Order(models.Model):
             models.Index(fields=["created_by"]),
             models.Index(fields=["order_date", "comanda_number"]),
         ]
+
+    @property
+    def payment_display(self):
+        """Rótulo de pagamento para exibição: 'Misto' quando dividido."""
+        if self.is_split:
+            return "Misto"
+        return self.get_payment_method_display()
 
     @property
     def has_total_divergence(self):
@@ -448,3 +465,39 @@ class OrderItemAddon(models.Model):
     def __str__(self):
         status = "grátis" if self.is_included else f"R$ {self.unit_price}"
         return f"{self.name} ({status})"
+
+
+class OrderPayment(models.Model):
+    """
+    Linha de pagamento de um pedido: uma forma de pagamento e o valor pago nela.
+
+    Fonte única de verdade para os relatórios por forma de pagamento. Um pedido pago
+    de forma simples tem exatamente uma linha (amount == total); um pedido dividido
+    tem duas ou mais, cuja soma dos `amount` é igual ao `total` do pedido.
+    """
+
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name="payments", verbose_name="Pedido"
+    )
+    method = models.CharField(
+        max_length=10,
+        choices=Order.PaymentMethod.choices,
+        verbose_name="Forma de pagamento",
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Valor",
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+
+    class Meta:
+        verbose_name = "Pagamento do Pedido"
+        verbose_name_plural = "Pagamentos do Pedido"
+        indexes = [
+            models.Index(fields=["order"]),
+            models.Index(fields=["method"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_method_display()} — R$ {self.amount}"

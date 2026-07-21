@@ -185,6 +185,72 @@
                         </select>
                     </div>
 
+                    <!-- Pagamento dividido -->
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   name="is_split" value="1" id="id_is_split"
+                                   {% if post_data.is_split %}checked{% endif %}>
+                            <label class="form-check-label small" for="id_is_split">
+                                Dividir pagamento em duas formas
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 {% if not post_data.is_split %}d-none{% endif %}" id="split-panel">
+                        <div class="border rounded p-2 bg-light">
+                            <!-- 1ª forma -->
+                            <div class="row g-2 align-items-end mb-2">
+                                <div class="col-6 col-md-5">
+                                    <label class="form-label small fw-medium mb-1" for="id_split_method_1">1ª forma</label>
+                                    <select name="split_method_1" id="id_split_method_1" class="form-select">
+                                        {% for value, label in payment_choices %}
+                                        <option value="{{ value }}"
+                                                {% if post_data.split_method_1 == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label small fw-medium mb-1" for="id_split_amount_1">Valor</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" name="split_amount_1" id="id_split_amount_1"
+                                               class="form-control" step="0.01" min="0"
+                                               placeholder="0,00" autocomplete="off"
+                                               value="{{ post_data.split_amount_1|default:'' }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 2ª forma -->
+                            <div class="row g-2 align-items-end">
+                                <div class="col-6 col-md-5">
+                                    <label class="form-label small fw-medium mb-1" for="id_split_method_2">2ª forma</label>
+                                    <select name="split_method_2" id="id_split_method_2" class="form-select">
+                                        {% for value, label in payment_choices %}
+                                        <option value="{{ value }}"
+                                                {% if post_data.split_method_2 == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label small fw-medium mb-1" for="id_split_amount_2">Valor</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" name="split_amount_2" id="id_split_amount_2"
+                                               class="form-control" step="0.01" min="0"
+                                               placeholder="0,00" autocomplete="off"
+                                               value="{{ post_data.split_amount_2|default:'' }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="d-block mt-2 text-muted" id="split-remainder-info"></small>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -454,5 +520,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/order_form.js' %}?v=4"></script>
+<script src="{% static 'js/order_form.js' %}?v=6"></script>
 {% endblock %}

@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from orders.models import Order, OrderItem, OrderItemAddon, Product
+from orders.models import Order, OrderItem, OrderItemAddon, OrderPayment, Product
 
 _UNSET = object()  # sentinel para distinguir "não passou" de None em update_order
 
@@ -37,14 +37,15 @@ def recalculate_closing_from_orders(*, date):
     from finance.models import DailyClosing
     from finance.services import create_daily_closing, update_daily_closing
 
-    agg = Order.objects.filter(
-        order_date=date,
-        status=Order.Status.ACTIVE,
+    # Soma por forma de pagamento a partir das linhas de pagamento (fonte única),
+    # para atribuir corretamente pedidos com pagamento dividido.
+    agg = OrderPayment.objects.filter(
+        order__order_date=date,
+        order__status=Order.Status.ACTIVE,
     ).aggregate(
-        total_count=Sum("id", default=0),  # Count via Sum trick — usamos Count abaixo
-        cash=Sum("total", filter=Q(payment_method=Order.PaymentMethod.CASH)),
-        pix=Sum("total", filter=Q(payment_method=Order.PaymentMethod.PIX)),
-        card=Sum("total", filter=Q(payment_method=Order.PaymentMethod.CARD)),
+        cash=Sum("amount", filter=Q(method=Order.PaymentMethod.CASH)),
+        pix=Sum("amount", filter=Q(method=Order.PaymentMethod.PIX)),
+        card=Sum("amount", filter=Q(method=Order.PaymentMethod.CARD)),
     )
 
     # Contar separadamente (mais legível)
@@ -203,6 +204,46 @@ def _create_manual_item(*, order, item_data):
     return line_total
 
 
+def _sync_order_payments(*, order, payment_method, payments):
+    """
+    (Re)cria as linhas de pagamento do pedido e ajusta `is_split`/`payment_method`.
+
+    - `payments` None ou vazio: pagamento simples com uma única linha (amount == total),
+      usando `payment_method`.
+    - `payments` com uma ou mais linhas: usa a lista. A soma dos valores deve ser
+      exatamente igual ao total do pedido, senão levanta ValueError.
+
+    Cada linha de `payments` é um dict {'method': <PaymentMethod>, 'amount': Decimal}.
+    """
+    OrderPayment.objects.filter(order=order).delete()
+
+    if not payments:
+        OrderPayment.objects.create(order=order, method=payment_method, amount=order.total)
+        order.is_split = False
+        order.payment_method = payment_method
+        return
+
+    total_paid = sum((p["amount"] for p in payments), Decimal("0.00"))
+    if total_paid != order.total:
+        raise ValueError(
+            f"A soma dos pagamentos (R$ {total_paid}) é diferente do total do "
+            f"pedido (R$ {order.total})."
+        )
+
+    for p in payments:
+        if p["amount"] <= Decimal("0.00"):
+            raise ValueError("Cada forma de pagamento deve ter valor maior que zero.")
+        OrderPayment.objects.create(order=order, method=p["method"], amount=p["amount"])
+
+    if len(payments) > 1:
+        order.is_split = True
+        # Forma predominante (maior valor) para exibições que usam payment_method.
+        order.payment_method = max(payments, key=lambda p: p["amount"])["method"]
+    else:
+        order.is_split = False
+        order.payment_method = payments[0]["method"]
+
+
 def create_order(
     *,
     comanda_number,
@@ -214,6 +255,7 @@ def create_order(
     notes="",
     informed_total=None,
     idempotency_key=None,
+    payments=None,
 ):
     """
     Cria um pedido completo com itens e adicionais em transaction.atomic.
@@ -267,7 +309,8 @@ def create_order(
                 order_total += _create_catalog_item(order=order, item_data=item_data)
 
         order.total = order_total
-        order.save(update_fields=["total", "updated_at"])
+        _sync_order_payments(order=order, payment_method=payment_method, payments=payments)
+        order.save(update_fields=["total", "payment_method", "is_split", "updated_at"])
 
     today = timezone.localdate()
     if order_date == today:
@@ -321,6 +364,7 @@ def update_order(
     payment_method=None,
     notes=None,
     informed_total=_UNSET,
+    payments=_UNSET,
 ):
     """
     Atualiza campos do cabeçalho do pedido, verificando a janela de edição (DA-17).
@@ -330,6 +374,12 @@ def update_order(
 
     Passa `informed_total=None` para limpar o campo.
     Omite o parâmetro para não alterar o campo.
+
+    Pagamento:
+    - `payments` (lista de {'method', 'amount'}) reconstrói as linhas de pagamento;
+      usado para pagamento dividido. A soma deve bater com o total do pedido.
+    - Se `payments` não for passado mas `payment_method` sim, o pedido volta a ser
+      simples com uma única linha (amount == total).
     """
     from finance.models import DailyClosing
 
@@ -339,27 +389,40 @@ def update_order(
                 "O dia já foi fechado. Apenas administradores podem alterar este pedido."
             )
 
-    update_fields = ["updated_at"]
+    with transaction.atomic():
+        update_fields = ["updated_at"]
 
-    if comanda_number is not None:
-        order.comanda_number = comanda_number
-        update_fields.append("comanda_number")
+        if comanda_number is not None:
+            order.comanda_number = comanda_number
+            update_fields.append("comanda_number")
 
-    if order_time is not None:
-        order.order_time = order_time
-        update_fields.append("order_time")
+        if order_time is not None:
+            order.order_time = order_time
+            update_fields.append("order_time")
 
-    if payment_method is not None:
-        order.payment_method = payment_method
-        update_fields.append("payment_method")
+        if notes is not None:
+            order.notes = notes
+            update_fields.append("notes")
 
-    if notes is not None:
-        order.notes = notes
-        update_fields.append("notes")
+        if informed_total is not _UNSET:
+            order.informed_total = informed_total
+            update_fields.append("informed_total")
 
-    if informed_total is not _UNSET:
-        order.informed_total = informed_total
-        update_fields.append("informed_total")
+        if payments is not _UNSET:
+            # Pagamento dividido (ou lista com uma linha) reconstrói as linhas.
+            _sync_order_payments(
+                order=order, payment_method=order.payment_method, payments=payments
+            )
+            update_fields += ["payment_method", "is_split"]
+        elif payment_method is not None:
+            # Pagamento simples: uma única forma para o total.
+            _sync_order_payments(order=order, payment_method=payment_method, payments=None)
+            update_fields += ["payment_method", "is_split"]
 
-    order.save(update_fields=update_fields)
+        order.save(update_fields=update_fields)
+
+    today = timezone.localdate()
+    if order.order_date == today:
+        recalculate_closing_from_orders(date=order.order_date)
+
     return order

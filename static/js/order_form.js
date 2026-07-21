@@ -45,7 +45,11 @@
     // =========================================================================
     // Ordem fixa das categorias exibidas (conforme cardápio)
     // =========================================================================
-    var CATEGORY_ORDER = ['Açaís Prontos', 'Monte seu Açaí', 'Sorvetes', 'Vitaminas'];
+    var CATEGORY_ORDER = ['Açaís Prontos', 'Monte seu Açaí', 'Sorvetes', 'Vitaminas', 'Brindes'];
+
+    // Categoria de brindes: usa grade de clique rápido (igual ao picker de
+    // acréscimos), em vez do fluxo passo-a-passo de catálogo.
+    var BRINDE_CATEGORY_NAME = 'Brindes';
 
     function getSortedCategories() {
         return CATEGORY_ORDER
@@ -89,6 +93,15 @@
     var informedInput    = document.getElementById('id_informed_total');
     var divergenceAlert  = document.getElementById('divergence-alert');
     var divergenceMsg    = document.getElementById('divergence-msg');
+    var paymentSelect    = document.getElementById('id_payment_method');
+    var splitCheckbox    = document.getElementById('id_is_split');
+    var splitPanel       = document.getElementById('split-panel');
+    var splitMethod1     = document.getElementById('id_split_method_1');
+    var splitAmount1     = document.getElementById('id_split_amount_1');
+    var splitMethod2     = document.getElementById('id_split_method_2');
+    var splitAmount2     = document.getElementById('id_split_amount_2');
+    var splitRemainder   = document.getElementById('split-remainder-info');
+    var splitAnchor      = '2';  // qual valor foi digitado por último ('1' ou '2')
     var formItems        = document.getElementById('form-items');
     var orderForm        = document.getElementById('order-form');
     var btnSubmit        = document.getElementById('btn-submit');
@@ -194,7 +207,86 @@
         setStepTitle(cat.name, true);
         updateAddButton();
 
-        renderProducts(cat.products); // pode auto-avançar para variantes se houver 1 produto
+        if (cat.name === BRINDE_CATEGORY_NAME) {
+            renderBrindePicker(cat); // grade de clique rápido — clicou, já entra no pedido
+        } else {
+            renderProducts(cat.products); // pode auto-avançar para variantes se houver 1 produto
+        }
+    }
+
+    // =========================================================================
+    // Aba Brindes: grade de clique rápido (adiciona ao pedido a cada clique)
+    // =========================================================================
+    function renderBrindePicker(cat) {
+        prodButtons.innerHTML = '';
+
+        cat.products.forEach(function (prod) {
+            var v = prod.variants[0];
+            if (!v) return;
+
+            var col = document.createElement('div');
+            col.className = 'col';
+
+            var sizePart = (v.display && v.display !== prod.name) ? ' ' + v.display : '';
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-outline-secondary w-100';
+            btn.dataset.brindeVariantId = v.id;
+            btn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:.4rem .5rem;line-height:1.3;gap:.1rem;position:relative';
+            btn.innerHTML =
+                '<span class="d-block" style="font-size:.87rem">' + prod.name + sizePart + '</span>' +
+                '<span class="d-block" style="font-size:.8rem;font-weight:700;color:#198754">Grátis</span>';
+            btn.addEventListener('click', function () { addBrindeToCart(prod); });
+
+            col.appendChild(btn);
+            prodButtons.appendChild(col);
+        });
+
+        syncBrindePickerCounts();
+    }
+
+    function addBrindeToCart(prod) {
+        var v = prod.variants[0];
+        if (!v) return;
+        cart.push({
+            itemType:       'CATALOG',
+            variantId:      v.id,
+            productName:    prod.name,
+            variantDisplay: (v.display && v.display !== prod.name) ? v.display : '',
+            quantity:       1,
+            unitPrice:      parsePrice(v.price),
+            addons:         [],
+            lineTotal:      parsePrice(v.price),
+        });
+        renderCart();
+    }
+
+    function syncBrindePickerCounts() {
+        var counts = {};
+        cart.forEach(function (item) {
+            if (item.itemType === 'CATALOG' && item.variantId != null) {
+                counts[item.variantId] = (counts[item.variantId] || 0) + item.quantity;
+            }
+        });
+        prodButtons.querySelectorAll('button[data-brinde-variant-id]').forEach(function (btn) {
+            var count = counts[btn.dataset.brindeVariantId] || 0;
+            var badge = btn.querySelector('.addon-qty-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'addon-qty-badge';
+                    btn.appendChild(badge);
+                }
+                badge.textContent = count;
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-outline-success');
+            } else {
+                if (badge) badge.remove();
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
     }
 
     // =========================================================================
@@ -568,6 +660,7 @@
             btnSubmit.disabled = true;
             updateTotal();
             syncAddonPickerCounts();
+            syncBrindePickerCounts();
             return;
         }
 
@@ -613,12 +706,65 @@
         if (cartCount) cartCount.textContent = cart.length;
         updateTotal();
         syncAddonPickerCounts();
+        syncBrindePickerCounts();
+    }
+
+    function cartTotalValue() {
+        return cart.reduce(function (sum, item) { return sum + item.lineTotal; }, 0);
+    }
+
+    function paymentLabel(value) {
+        if (!paymentSelect || !value) return '';
+        var opt = paymentSelect.querySelector('option[value="' + value + '"]');
+        return opt ? opt.textContent.trim() : value;
+    }
+
+    // Pagamento dividido: duas formas, cada uma com seu valor. Ao digitar o valor
+    // de uma delas, a outra é completada automaticamente com o restante do total.
+    function updateSplit() {
+        if (!splitCheckbox) return;
+        var on = splitCheckbox.checked;
+        toggleSection(splitPanel, on);
+        // Enquanto dividido, o seletor único de cima fica desativado (não é usado).
+        if (paymentSelect) paymentSelect.disabled = on;
+        if (!on) {
+            if (splitRemainder) splitRemainder.textContent = '';
+            return;
+        }
+        var total = cartTotalValue();
+        var a1 = parseFloat((splitAmount1.value || '').replace(',', '.')) || 0;
+        var a2 = parseFloat((splitAmount2.value || '').replace(',', '.')) || 0;
+
+        // Completa automaticamente o outro valor com base no que foi digitado.
+        if (splitAnchor === '1') {
+            a2 = total - a1;
+            splitAmount2.value = a2 >= -0.005 ? a2.toFixed(2) : '';
+        } else {
+            a1 = total - a2;
+            splitAmount1.value = a1 >= -0.005 ? a1.toFixed(2) : '';
+        }
+
+        if (!splitRemainder) return;
+        var soma = a1 + a2;
+        if (a1 < -0.005 || a2 < -0.005) {
+            splitRemainder.className = 'd-block text-danger fw-semibold';
+            splitRemainder.textContent = 'Valor maior que o total do pedido (R$ ' +
+                fmt(total).replace('R$ ', '') + ').';
+        } else if (Math.abs(soma - total) > 0.005) {
+            splitRemainder.className = 'd-block text-danger fw-semibold';
+            splitRemainder.textContent = 'A soma (' + fmt(soma) + ') precisa bater com o total ' +
+                fmt(total) + '.';
+        } else {
+            splitRemainder.className = 'd-block text-success fw-medium';
+            splitRemainder.textContent = 'Soma confere: ' + fmt(total) + '.';
+        }
     }
 
     function updateTotal() {
         var total = cart.reduce(function (sum, item) { return sum + item.lineTotal; }, 0);
         if (orderTotal) orderTotal.textContent = fmt(total);
         if (cartCount)  cartCount.textContent  = cart.length;
+        updateSplit();
 
         if (informedInput && informedInput.value.trim()) {
             var informed = parseFloat(informedInput.value);
@@ -671,6 +817,31 @@
             orderForm.prepend(alertEl);
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
+        }
+
+        // Validação do pagamento dividido
+        if (splitCheckbox && splitCheckbox.checked) {
+            var splitTotal = cartTotalValue();
+            var splitA1 = parseFloat((splitAmount1.value || '').replace(',', '.')) || 0;
+            var splitA2 = parseFloat((splitAmount2.value || '').replace(',', '.')) || 0;
+            var splitMsg = null;
+            if (splitMethod1.value === splitMethod2.value) {
+                splitMsg = 'As duas formas de pagamento devem ser diferentes.';
+            } else if (splitA1 <= 0 || splitA2 <= 0) {
+                splitMsg = 'Informe um valor maior que zero nas duas formas.';
+            } else if (Math.abs(splitA1 + splitA2 - splitTotal) > 0.005) {
+                splitMsg = 'A soma das duas formas deve ser igual ao total do pedido (' +
+                    fmt(splitTotal) + ').';
+            }
+            if (splitMsg) {
+                e.preventDefault();
+                var sAlert = document.createElement('div');
+                sAlert.className = 'alert alert-danger';
+                sAlert.textContent = splitMsg;
+                orderForm.prepend(sAlert);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
         }
 
         if (isSubmitting) {
@@ -730,6 +901,12 @@
     if (btnAddItem)    btnAddItem.addEventListener('click', addItemToCart);
     if (btnAddManual)  btnAddManual.addEventListener('click', addManualItemToCart);
     if (btnManualItem) btnManualItem.addEventListener('click', selectManualMode);
+
+    if (splitCheckbox) splitCheckbox.addEventListener('change', updateSplit);
+    if (splitAmount1)  splitAmount1.addEventListener('input', function () { splitAnchor = '1'; updateSplit(); });
+    if (splitAmount2)  splitAmount2.addEventListener('input', function () { splitAnchor = '2'; updateSplit(); });
+    if (splitMethod1)  splitMethod1.addEventListener('change', updateSplit);
+    if (splitMethod2)  splitMethod2.addEventListener('change', updateSplit);
     if (orderForm)     orderForm.addEventListener('submit', handleSubmit);
     if (informedInput) informedInput.addEventListener('input', updateTotal);
     if (btnBackStep)   btnBackStep.addEventListener('click', goBack);
@@ -777,10 +954,19 @@
         } catch (e) {}
     }
 
+    // Garante que a 2ª forma comece diferente da 1ª.
+    if (splitMethod1 && splitMethod2 && splitMethod1.value === splitMethod2.value) {
+        var opts = splitMethod2.options;
+        for (var oi = 0; oi < opts.length; oi++) {
+            if (opts[oi].value !== splitMethod1.value) { splitMethod2.selectedIndex = oi; break; }
+        }
+    }
+
     renderCategories();
     renderAddonPicker();
     renderCart();
     updateAddButton();
     updateManualAddButton();
+    updateSplit();
 
 }());

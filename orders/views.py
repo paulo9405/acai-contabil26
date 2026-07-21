@@ -16,6 +16,7 @@ from orders.selectors import (
     get_catalog_json,
     get_daily_order_totals,
     get_divergences,
+    get_gifts_report,
     get_liters_sold,
     get_order_detail,
     get_orders_by_date_with_items,
@@ -93,6 +94,10 @@ class OrderCreateView(LoginRequiredMixin, View):
         payment_method = request.POST.get("payment_method", "").strip()
         informed_total_str = request.POST.get("informed_total", "").strip()
         notes = request.POST.get("notes", "").strip()
+        is_split = request.POST.get("is_split") == "1"
+        # No modo dividido a forma "principal" é a 1ª forma do painel.
+        if is_split:
+            payment_method = request.POST.get("split_method_1", "").strip()
 
         item_types = request.POST.getlist("item_type[]")
         variant_ids = request.POST.getlist("item_variant_id[]")
@@ -113,7 +118,7 @@ class OrderCreateView(LoginRequiredMixin, View):
         if not order_time_str:
             errors.append("Horário é obrigatório.")
         if not payment_method:
-            errors.append("Forma de pagamento é obrigatória.")
+            errors.append("Selecione a forma de pagamento.")
         if n_items == 0:
             errors.append("Adicione pelo menos um item ao pedido.")
 
@@ -136,6 +141,27 @@ class OrderCreateView(LoginRequiredMixin, View):
             informed_total = safe_decimal(informed_total_str)
             if informed_total is None:
                 errors.append("Valor informado na comanda inválido.")
+
+        # Pagamento dividido: duas formas, cada uma com seu valor.
+        payments = None
+        if is_split:
+            method_1 = payment_method  # já lido de split_method_1
+            method_2 = request.POST.get("split_method_2", "").strip()
+            amount_1 = safe_decimal(request.POST.get("split_amount_1", ""))
+            amount_2 = safe_decimal(request.POST.get("split_amount_2", ""))
+            if not method_2:
+                errors.append("Selecione a segunda forma de pagamento.")
+            elif method_1 and method_1 == method_2:
+                errors.append("As duas formas de pagamento devem ser diferentes.")
+            if amount_1 is None or amount_1 <= Decimal("0"):
+                errors.append("Informe o valor da primeira forma de pagamento.")
+            if amount_2 is None or amount_2 <= Decimal("0"):
+                errors.append("Informe o valor da segunda forma de pagamento.")
+            if amount_1 is not None and amount_2 is not None:
+                payments = [
+                    {"method": method_1, "amount": amount_1},
+                    {"method": method_2, "amount": amount_2},
+                ]
 
         if errors:
             ctx = self._context(post_data=request.POST, form_errors=errors)
@@ -206,6 +232,7 @@ class OrderCreateView(LoginRequiredMixin, View):
                 notes=notes,
                 informed_total=informed_total,
                 idempotency_key=idempotency_key,
+                payments=payments,
             )
             messages.success(
                 request, f"Pedido #{order.pk} lançado com sucesso! Total: R$ {order.total}"
@@ -309,6 +336,11 @@ class OrderUpdateView(LoginRequiredMixin, View):
         return order
 
     def _render_form(self, request, order, post_data=None):
+        first_payment = None
+        second_payment = None
+        if order.is_split:
+            first_payment = order.payments.filter(method=order.payment_method).first()
+            second_payment = order.payments.exclude(method=order.payment_method).first()
         return render(
             request,
             self.template_name,
@@ -316,6 +348,10 @@ class OrderUpdateView(LoginRequiredMixin, View):
                 "order": order,
                 "payment_choices": Order.PaymentMethod.choices,
                 "post_data": post_data or {},
+                "initial_split_method_1": first_payment.method if first_payment else "",
+                "initial_split_amount_1": first_payment.amount if first_payment else "",
+                "initial_split_method_2": second_payment.method if second_payment else "",
+                "initial_split_amount_2": second_payment.amount if second_payment else "",
             },
         )
 
@@ -338,6 +374,10 @@ class OrderUpdateView(LoginRequiredMixin, View):
         payment_method = request.POST.get("payment_method", "").strip()
         informed_total_str = request.POST.get("informed_total", "").strip()
         notes = request.POST.get("notes", "").strip()
+        is_split = request.POST.get("is_split") == "1"
+        # No modo dividido a forma "principal" é a 1ª forma do painel.
+        if is_split:
+            payment_method = request.POST.get("split_method_1", "").strip()
 
         errors = []
         if not comanda_number:
@@ -345,7 +385,7 @@ class OrderUpdateView(LoginRequiredMixin, View):
         if not order_time_str:
             errors.append("Horário é obrigatório.")
         if not payment_method:
-            errors.append("Forma de pagamento é obrigatória.")
+            errors.append("Selecione a forma de pagamento.")
 
         order_time = None
         try:
@@ -360,21 +400,45 @@ class OrderUpdateView(LoginRequiredMixin, View):
             if informed_total is None:
                 errors.append("Valor informado inválido.")
 
+        # Pagamento dividido: duas formas, cada uma com seu valor.
+        payments = None
+        if is_split:
+            method_1 = payment_method  # já lido de split_method_1
+            method_2 = request.POST.get("split_method_2", "").strip()
+            amount_1 = safe_decimal(request.POST.get("split_amount_1", ""))
+            amount_2 = safe_decimal(request.POST.get("split_amount_2", ""))
+            if not method_2:
+                errors.append("Selecione a segunda forma de pagamento.")
+            elif method_1 and method_1 == method_2:
+                errors.append("As duas formas de pagamento devem ser diferentes.")
+            if amount_1 is None or amount_1 <= Decimal("0"):
+                errors.append("Informe o valor da primeira forma de pagamento.")
+            if amount_2 is None or amount_2 <= Decimal("0"):
+                errors.append("Informe o valor da segunda forma de pagamento.")
+            if amount_1 is not None and amount_2 is not None:
+                payments = [
+                    {"method": method_1, "amount": amount_1},
+                    {"method": method_2, "amount": amount_2},
+                ]
+
         if errors:
             for msg in errors:
                 messages.error(request, msg)
             return self._render_form(request, order, post_data=request.POST)
 
         try:
-            update_order(
-                order=order,
-                updated_by=request.user,
-                comanda_number=comanda_number,
-                order_time=order_time,
-                payment_method=payment_method,
-                notes=notes,
-                informed_total=informed_total,
-            )
+            update_kwargs = {
+                "order": order,
+                "updated_by": request.user,
+                "comanda_number": comanda_number,
+                "order_time": order_time,
+                "payment_method": payment_method,
+                "notes": notes,
+                "informed_total": informed_total,
+            }
+            if payments is not None:
+                update_kwargs["payments"] = payments
+            update_order(**update_kwargs)
             messages.success(request, f"Pedido #{order.pk} atualizado com sucesso.")
             return redirect("order-detail", pk=order.pk)
         except PermissionError as exc:
@@ -476,6 +540,7 @@ class OrderReportView(LoginRequiredMixin, View):
             context["top_products"] = get_top_products(start_date=start_date, end_date=end_date)
             context["top_sizes"] = get_top_sizes(start_date=start_date, end_date=end_date)
             context["top_addons"] = get_top_addons(start_date=start_date, end_date=end_date)
+            context["gifts_report"] = get_gifts_report(start_date=start_date, end_date=end_date)
             context["peak_hours"] = get_peak_hours(start_date=start_date, end_date=end_date)
             context["divergences"] = get_divergences(start_date=start_date, end_date=end_date)
             context["daily_totals"] = get_daily_order_totals(

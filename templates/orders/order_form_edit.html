@@ -135,6 +135,72 @@
                         </select>
                     </div>
 
+                    <!-- Pagamento dividido -->
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   name="is_split" value="1" id="id_is_split"
+                                   {% if post_data %}{% if post_data.is_split %}checked{% endif %}{% elif order.is_split %}checked{% endif %}>
+                            <label class="form-check-label" for="id_is_split">
+                                Dividir pagamento em duas formas
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 d-none" id="split-panel">
+                        <div class="border rounded p-2 bg-light">
+                            <!-- 1ª forma -->
+                            <div class="row g-2 align-items-end mb-2">
+                                <div class="col-6 col-md-5">
+                                    <label class="form-label fw-medium" for="id_split_method_1">1ª forma</label>
+                                    <select name="split_method_1" id="id_split_method_1" class="form-select">
+                                        {% for value, label in payment_choices %}
+                                        <option value="{{ value }}"
+                                            {% if post_data.split_method_1 == value %}selected
+                                            {% elif not post_data and initial_split_method_1 == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label fw-medium" for="id_split_amount_1">Valor</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" name="split_amount_1" id="id_split_amount_1"
+                                               class="form-control" step="0.01" min="0" placeholder="0,00" autocomplete="off"
+                                               value="{{ post_data.split_amount_1|default:initial_split_amount_1|default:''|unlocalize }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 2ª forma -->
+                            <div class="row g-2 align-items-end">
+                                <div class="col-6 col-md-5">
+                                    <label class="form-label fw-medium" for="id_split_method_2">2ª forma</label>
+                                    <select name="split_method_2" id="id_split_method_2" class="form-select">
+                                        {% for value, label in payment_choices %}
+                                        <option value="{{ value }}"
+                                            {% if post_data.split_method_2 == value %}selected
+                                            {% elif not post_data and initial_split_method_2 == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label fw-medium" for="id_split_amount_2">Valor</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" name="split_amount_2" id="id_split_amount_2"
+                                               class="form-control" step="0.01" min="0" placeholder="0,00" autocomplete="off"
+                                               value="{{ post_data.split_amount_2|default:initial_split_amount_2|default:''|unlocalize }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="d-block mt-2 text-muted" id="split-remainder-info"></small>
+                        </div>
+                    </div>
+
                     <div class="col-12 col-md-5">
                         <label class="form-label fw-medium" for="id_informed_total">
                             Valor na comanda
@@ -177,4 +243,53 @@
 
     </form>
 </div>
+
+<script>
+(function () {
+    var orderTotal = parseFloat('{{ order.total|unlocalize }}') || 0;
+    var checkbox   = document.getElementById('id_is_split');
+    var panel      = document.getElementById('split-panel');
+    var method1    = document.getElementById('id_split_method_1');
+    var amount1    = document.getElementById('id_split_amount_1');
+    var method2    = document.getElementById('id_split_method_2');
+    var amount2    = document.getElementById('id_split_amount_2');
+    var paymentSel = document.getElementById('id_payment_method');
+    var remainder  = document.getElementById('split-remainder-info');
+    var anchor     = '2';
+
+    function fmt(v) { return 'R$ ' + parseFloat(v).toFixed(2).replace('.', ','); }
+
+    function update() {
+        var on = checkbox.checked;
+        panel.classList.toggle('d-none', !on);
+        if (paymentSel) paymentSel.disabled = on;
+        if (!on) { remainder.textContent = ''; return; }
+        var a1 = parseFloat((amount1.value || '').replace(',', '.')) || 0;
+        var a2 = parseFloat((amount2.value || '').replace(',', '.')) || 0;
+        if (anchor === '1') {
+            a2 = orderTotal - a1;
+            amount2.value = a2 >= -0.005 ? a2.toFixed(2) : '';
+        } else {
+            a1 = orderTotal - a2;
+            amount1.value = a1 >= -0.005 ? a1.toFixed(2) : '';
+        }
+        var soma = a1 + a2;
+        if (a1 < -0.005 || a2 < -0.005 || Math.abs(soma - orderTotal) > 0.005) {
+            remainder.className = 'd-block text-danger fw-semibold';
+            remainder.textContent = 'A soma deve ser igual ao total ' + fmt(orderTotal) + '.';
+        } else {
+            remainder.className = 'd-block text-success fw-medium';
+            remainder.textContent = 'Soma confere: ' + fmt(orderTotal) + '.';
+        }
+    }
+    if (checkbox) {
+        checkbox.addEventListener('change', update);
+        amount1.addEventListener('input', function () { anchor = '1'; update(); });
+        amount2.addEventListener('input', function () { anchor = '2'; update(); });
+        method1.addEventListener('change', update);
+        method2.addEventListener('change', update);
+        update();
+    }
+}());
+</script>
 {% endblock %}
